@@ -116,9 +116,9 @@ npm start         # speel lokaal op http://localhost:8080/
 
 Heb je al een Chromium, dan kun je `npm run setup` overslaan en `PW_CHROMIUM_PATH=/pad/naar/chrome` meegeven (alleen voor de Chromium-projecten).
 
-De tests draaien in Chromium (desktop en Android-emulatie), WebKit (iPhone-emulatie) en Firefox, met software-WebGL. Ze dekken onder meer: laden zonder fouten en zonder externe verzoeken, lopen en sprinten, pauze, winnen en verliezen, jagers die om huizen heen lopen, de camera bij muren, de foutschermen, de moeilijkheid, het tekenbudget en de balans (`tests/balance.spec.js`, met bots op 12 vaste kaarten).
+De tests draaien in Chromium (desktop en Android-emulatie) en WebKit (iPhone-emulatie), met software-WebGL. Headless Firefox kan in CI geen WebGL starten; daar controleert één test alleen dat het script zonder fouten draait en netjes het foutscherm toont. Ze dekken onder meer: laden zonder fouten en zonder externe verzoeken, lopen en sprinten, pauze, winnen en verliezen, jagers die om huizen heen lopen, de camera bij muren, de foutschermen, de moeilijkheid, het tekenbudget en de balans (`tests/balance.spec.js`, met bots op 12 vaste kaarten).
 
-Wat de tests niet dekken: echte telefoons en hun GPU's, en echte spelers. Speel na een grote wijziging zelf een potje op je telefoon; het pauzescherm toont de fps.
+Wat de tests niet dekken: echte telefoons en hun GPU's, het spelen in Firefox, en echte spelers. Speel na een grote wijziging zelf een potje op je telefoon; het pauzescherm toont de fps.
 
 Andere hulpmiddelen:
 

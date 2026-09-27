@@ -5,7 +5,8 @@
 //
 // Tests wachten op speltijd (tNow) of stappen de simulatie zelf door, nooit op de wandklok alleen:
 // software-WebGL in CI kan traag zijn, en dan loopt de speltijd achter.
-// Tests met @kern draaien ook in WebKit (iPhone) en Firefox.
+// Tests met @kern draaien ook in WebKit (iPhone-emulatie); Firefox draait alleen de @firefox-test,
+// omdat headless Firefox in CI geen WebGL-context kan maken.
 const { test, expect } = require('@playwright/test');
 
 /** Opent de game en wacht tot de startknop klaarstaat. Verzamelt fouten en verzoeken. */
@@ -288,6 +289,23 @@ test('foutscherm met meldlink als Three.js niet laadt @kern', async ({ page }) =
   await expect(page.locator('#errTitle')).toHaveText('Spel kon niet laden');
   await expect(page.locator('#startScr')).toBeHidden();
   await expect(page.locator('#errReport')).toHaveAttribute('href', /browser=/);
+});
+
+test('script draait volledig; zonder WebGL volgt netjes het foutscherm @firefox', async ({ page }) => {
+  // Headless Firefox heeft in CI geen WebGL. Deze test bewijst dan dat het hele script in Gecko
+  // zonder syntax- of runtimefouten draait tot aan de renderer, en dat de speler een nette uitleg krijgt.
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await page.waitForFunction(() => !document.getElementById('btnStart').disabled
+    || getComputedStyle(document.getElementById('errScr')).display !== 'none', null, { timeout: 20_000 });
+  const fout = await page.evaluate(() => getComputedStyle(document.getElementById('errScr')).display !== 'none');
+  if (fout) {
+    await expect(page.locator('#errTitle')).toHaveText('3D wordt niet ondersteund');
+    expect(errors.filter((m) => !/WebGL context/i.test(m))).toEqual([]);
+  } else {
+    expect(errors).toEqual([]);
+  }
 });
 
 test('foutscherm als WebGL niet start', async ({ page }) => {
