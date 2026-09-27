@@ -1,10 +1,13 @@
 // Minimale statische server voor lokaal spelen en de tests. Geen dependencies.
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+// SITE_DIR laat de tests draaien tegen precies de map die naar GitHub Pages gaat (zie CI).
+const ROOT = process.env.SITE_DIR
+  ? resolve(process.env.SITE_DIR)
+  : fileURLToPath(new URL('..', import.meta.url));
 const PORT = Number(process.env.PORT) || 8080;
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',

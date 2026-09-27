@@ -606,6 +606,9 @@ addEventListener('keyup', e=>{ const a = MOVE_KEYS[e.code]; if(a) keys[a]=false;
 // wie wegklikt of van tabblad wisselt, vindt het spel gepauzeerd terug
 addEventListener('blur', ()=>{ clearInput(); if(state==='play') pauseGame(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ clearInput(); if(state==='play') pauseGame(); } });
+// Mobiele browsers kunnen de WebGL-context intrekken (bijv. na lang in de achtergrond). Three.js
+// herstelt die zelf; wij zorgen dat de klok zolang stilstaat.
+renderer.domElement.addEventListener('webglcontextlost', ()=>{ if(state==='play') pauseGame(); });
 addEventListener('contextmenu', e=>e.preventDefault());
 addEventListener('gesturestart', e=>e.preventDefault());
 
