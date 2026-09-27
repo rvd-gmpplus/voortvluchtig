@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>VOORTVLUCHTIG — ontsnap aan de jagers</title>
+<meta name="description" content="3D-ontsnappingsgame in de browser: blijf vijf minuten uit handen van drie jagers in een Hollands polderlandschap. Werkt op mobiel en desktop.">
+<meta name="theme-color" content="#0b0d10">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ccircle cx='32' cy='32' r='17' fill='none' stroke='%23e5484d' stroke-width='6'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23ff7a1a'/%3E%3C/svg%3E">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;position:fixed;inset:0;background:#0b0d10;
@@ -42,6 +45,7 @@ canvas{display:block}
 #stamFill{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,#ffd23f,#ff9f1a);
   transition:width .1s linear}
 #stamFill.boost{background:linear-gradient(90deg,#5df2a0,#19c37d)}
+#stamFill.tired{background:linear-gradient(90deg,#8b2f33,#c44a4f)}
 #hideChip{position:fixed;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;
   bottom:calc(env(safe-area-inset-bottom,0px) + 34px);padding:5px 14px;border-radius:999px;
   background:rgba(24,66,36,.92);border:1px solid #3fae63;font-weight:900;font-size:12px;
@@ -62,6 +66,11 @@ canvas{display:block}
 .btn.on{background:#c8232c;border-color:#ff8f92}
 .btn.hiddenB{display:none}
 .deskOnly #btnCol{display:none}
+#btnPause{position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 82px);z-index:8;
+  width:42px;height:42px;font-size:18px;display:none}
+body.playing #btnPause{display:flex}
+.row{display:flex;flex-direction:column;gap:10px}
+.big.alt{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);box-shadow:none}
 
 /* ---------- Screens ---------- */
 .scr{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
@@ -84,7 +93,23 @@ h1 span{color:#e5484d}
   font-weight:900;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
   box-shadow:0 8px 26px rgba(229,72,77,.4)}
 .big:active{transform:scale(.98)}
-#endScr{display:none}
+.big:disabled{opacity:.55;cursor:wait;box-shadow:none}
+button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
+#errScr{display:none}
+#errText{font-size:14px;line-height:1.5;color:#dde2e8;margin:10px 0 18px}
+
+/* ---------- smalle telefoons: meldingen onder timer en minikaart ---------- */
+@media (max-width:560px){
+  #mini{width:104px;height:104px}
+  #msgs{top:calc(env(safe-area-inset-top,0px) + 132px);max-width:92vw}
+  .msg{white-space:normal;text-align:center;font-size:12px;padding:6px 12px}
+}
+@media (prefers-reduced-motion:reduce){
+  #timer.low{animation:none}
+  .msg{animation:none;transition:none}
+  #vig{transition:none}
+}
+#endScr,#pauseScr{display:none}
 #endTitle{margin-bottom:2px}
 #endStats{font-size:14px;color:#c8ced6;margin:10px 0 18px;line-height:1.7;font-variant-numeric:tabular-nums}
 </style>
@@ -94,16 +119,17 @@ h1 span{color:#e5484d}
 
 <div id="vig"></div>
 <div id="topLeft" class="panel"><div id="timer">5:00</div><div id="pingT">📍 volgende deling: 45s</div></div>
-<canvas id="mini" width="264" height="264"></canvas>
+<canvas id="mini" width="264" height="264" role="img" aria-label="Minikaart met jouw positie"></canvas>
 <div id="msgs"></div>
 <div id="stamWrap"><div id="stamFill"></div></div>
 <div id="hideChip">🌿 VERSTOPT</div>
 
+<button id="btnPause" type="button" class="btn" aria-label="Pauze">⏸</button>
 <div id="joyBase"><div id="joyKnob"></div></div>
 <div id="btnCol">
-  <button id="btnAct" class="btn hiddenB">🚲</button>
-  <button id="btnHide" class="btn">🌿</button>
-  <button id="btnSprint" class="btn">🏃</button>
+  <button id="btnAct" type="button" class="btn hiddenB" aria-label="Fiets pakken">🚲</button>
+  <button id="btnHide" type="button" class="btn" aria-label="Bukken">🌿</button>
+  <button id="btnSprint" type="button" class="btn" aria-label="Sprinten (vasthouden)">🏃</button>
 </div>
 
 <div id="startScr" class="scr">
@@ -121,8 +147,8 @@ h1 span{color:#e5484d}
       <li><span class="ic">⚡</span><span>Energiedrank = volle conditie + korte snelheidsboost.</span></li>
     </ul>
     <div class="ctrl">📱 <b>Mobiel:</b> linkerhelft = joystick · rechterhelft vegen = camera · knoppen rechtsonder<br>
-      ⌨️ <b>Desktop:</b> WASD/pijltjes · Shift = sprint · C = bukken · E = fiets · muis slepen = camera · scroll = zoom</div>
-    <button id="btnStart" class="big">▶ Start de ontsnapping</button>
+      ⌨️ <b>Desktop:</b> WASD/pijltjes · Shift = sprint · C = bukken · E = fiets · muis slepen = camera · scroll = zoom · P/Esc = pauze · M = geluid</div>
+    <button id="btnStart" type="button" class="big" disabled>Laden…</button>
   </div>
 </div>
 
@@ -131,28 +157,53 @@ h1 span{color:#e5484d}
     <div class="eyebrow" id="endEyebrow">Uitzending afgelopen</div>
     <h1 id="endTitle">Gepakt!</h1>
     <div id="endStats"></div>
-    <button id="btnRetry" class="big">↻ Opnieuw proberen</button>
+    <button id="btnRetry" type="button" class="big">↻ Opnieuw proberen</button>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<div id="pauseScr" class="scr">
+  <div class="card">
+    <div class="eyebrow">Uitzending gepauzeerd</div>
+    <h1>Pau<span>ze</span></h1>
+    <div class="sub">De klok en de jagers staan stil tot je verdergaat.</div>
+    <div class="row">
+      <button id="btnResume" type="button" class="big">▶ Verder</button>
+      <button id="btnMute" type="button" class="big alt">🔊 Geluid: aan</button>
+      <button id="btnQuit" type="button" class="big alt">✕ Stoppen</button>
+    </div>
+  </div>
+</div>
+
+<div id="errScr" class="scr" role="alert">
+  <div class="card">
+    <div class="eyebrow">Uitzending onderbroken</div>
+    <h1 id="errTitle">Spel kon niet laden</h1>
+    <p id="errText"></p>
+    <button type="button" class="big" onclick="location.reload()">↻ Pagina herladen</button>
+  </div>
+</div>
+<noscript><div class="scr"><div class="card"><h1>JavaScript staat uit</h1><p style="font-size:14px;line-height:1.5;margin-top:10px">VOORTVLUCHTIG heeft JavaScript nodig. Zet het aan en herlaad de pagina.</p></div></div></noscript>
+
+<script src="vendor/three.min.js"></script>
 <script>
 /* =====================================================================
    VOORTVLUCHTIG — 3D klopjacht in de browser (mobiel + desktop)
-   Eén bestand, Three.js r128, geen build stap.
+   Eén bestand, Three.js r128 (lokaal in vendor/), geen build stap.
    Alle balans-knoppen staan hieronder in CFG.
    ===================================================================== */
 const CFG = {
   surviveTime: 300,          // seconden overleven om te winnen
   pingInterval: 45,          // locatiedeling-interval
   mapHalf: 480,              // wereld loopt van -480..480
+  worldEdge: 470,            // speler en jagers blijven binnen -470..470
   roads:  [-360, -120, 120, 360],   // wegen (beide assen)
   canals: [-240, 0, 240],           // sloten (beide assen)
   walk: 6, sprint: 10, crouch: 2.6, bike: 13.2, waterMul: 0.35,
   carSpeed: 16, footSpeed: 8.6,
   seeCar: 75, seeFoot: 55, seeHidden: 13, bikePenalty: 12,
-  catchR: 2.1, exitDist: 34, intelFreshDrive: 26, intelLive: 4,
+  catchR: 2.1, carCatchR: 2.2, exitDist: 34, intelFreshDrive: 26, intelLive: 4,
   stamMax: 100, stamDrain: 17, stamRegen: 11,
+  stamRecover: 30,           // na uitputting pas weer sprinten vanaf deze conditie
 };
 
 /* ---------- helpers ---------- */
@@ -170,17 +221,35 @@ function inWater(x,z){
   return false;
 }
 
+/* ---------- opstart: stop netjes als Three.js of WebGL ontbreekt ---------- */
+function fatal(title, text){
+  $('errTitle').textContent = title;
+  $('errText').textContent = text;
+  $('startScr').style.display = 'none';
+  $('errScr').style.display = 'flex';
+}
+if(!window.THREE){
+  fatal('Spel kon niet laden', 'Het 3D-onderdeel (Three.js) is niet binnengekomen. Controleer je verbinding en herlaad de pagina.');
+  throw new Error('VOORTVLUCHTIG: Three.js ontbreekt, spel gestopt');
+}
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+} catch(err){
+  fatal('3D wordt niet ondersteund', 'Deze browser of dit apparaat kan geen WebGL starten. Probeer een recente versie van Chrome, Safari, Firefox of Edge, of zet hardwareversnelling aan.');
+  throw err;
+}
+
 /* ---------- three.js basis ---------- */
-let scene, camera, renderer, clock;
-const V1=null, RAY=null; // placeholders vervangen na THREE load
+let scene, camera, clock;
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
 const ray = new THREE.Raycaster();
 
 scene = new THREE.Scene();
 scene.background = new THREE.Color(0xbfd9ea);
 scene.fog = new THREE.Fog(0xbfd9ea, 130, 430);
-camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.1, 900);
-renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+// near .5 en far net voorbij het einde van de mist: betere dieptenauwkeurigheid, zelfde beeld
+camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.5, 450);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.8));
 renderer.setSize(innerWidth, innerHeight);
 $('game').appendChild(renderer.domElement);
@@ -191,42 +260,43 @@ const sun = new THREE.DirectionalLight(0xfff1d6, 0.85);
 sun.position.set(140, 190, 90);
 scene.add(sun);
 
-const lam = c => new THREE.MeshLambertMaterial({color:c});
+// materialen worden per kleur gedeeld (scheelt honderden GPU-objecten)
+const matCache = new Map();
+const lam = c => { let m = matCache.get(c); if(!m){ m = new THREE.MeshLambertMaterial({color:c}); matCache.set(c, m); } return m; };
+const blobMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.24, depthWrite:false});
 function blob(r){
-  const m = new THREE.Mesh(new THREE.CircleGeometry(r,14),
-    new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.24, depthWrite:false}));
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r,14), blobMat);
   m.rotation.x = -Math.PI/2; m.position.y = .045; return m;
 }
 
 /* ---------- wereld ---------- */
-const boxColliders=[], circleColliders=[], losBlockers=[], bushes=[], bikes=[], drinks=[];
+const boxColliders=[], circleColliders=[], losBlockers=[], camBlockers=[], bushes=[], bikes=[], drinks=[];
 
 (function buildGround(){
-  const g = new THREE.Mesh(new THREE.PlaneGeometry(1120,1120), lam(0x79a35c));
-  g.rotation.x = -Math.PI/2; scene.add(g);
+  // Platte grondlagen liggen vrijwel op dezelfde hoogte. In plaats van op de dieptebuffer te
+  // vertrouwen (z-fighting op afstand) tekenen we ze in vaste volgorde, zonder dieptetest.
+  const layer = (geo, color, x, y, z, order) => {
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color, depthTest:false}));
+    m.rotation.x = -Math.PI/2; m.position.set(x, y, z); m.renderOrder = order; scene.add(m);
+    return m;
+  };
+  layer(new THREE.PlaneGeometry(1120,1120), 0x79a35c, 0, 0, 0, -10);
   const patchCols = [0x8fb968, 0xc7b45a, 0x6f9c53, 0x9db06a];
   for(let i=0;i<14;i++){
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(rand(55,105), rand(55,105)),
-      lam(patchCols[i%patchCols.length]));
-    p.rotation.x=-Math.PI/2; p.position.set(rand(-440,440), .012, rand(-440,440));
-    scene.add(p);
-  }
-  for(const r of CFG.roads){
-    const h = new THREE.Mesh(new THREE.PlaneGeometry(1120,10), lam(0x54585d));
-    h.rotation.x=-Math.PI/2; h.position.set(0,.02,r); scene.add(h);
-    const hl = new THREE.Mesh(new THREE.PlaneGeometry(1120,.5), lam(0xcfd3d8));
-    hl.rotation.x=-Math.PI/2; hl.position.set(0,.03,r); scene.add(hl);
-    const v = new THREE.Mesh(new THREE.PlaneGeometry(10,1120), lam(0x54585d));
-    v.rotation.x=-Math.PI/2; v.position.set(r,.021,0); scene.add(v);
-    const vl = new THREE.Mesh(new THREE.PlaneGeometry(.5,1120), lam(0xcfd3d8));
-    vl.rotation.x=-Math.PI/2; vl.position.set(r,.031,0); scene.add(vl);
+    layer(new THREE.PlaneGeometry(rand(55,105), rand(55,105)), patchCols[i%patchCols.length],
+      rand(-440,440), .012, rand(-440,440), -9);
   }
   for(const c of CFG.canals){
-    const wm = new THREE.MeshLambertMaterial({color:0x4a8fc7});
-    const h = new THREE.Mesh(new THREE.PlaneGeometry(1120,7), wm);
-    h.rotation.x=-Math.PI/2; h.position.set(0,.015,c); scene.add(h);
-    const v = new THREE.Mesh(new THREE.PlaneGeometry(7,1120), wm);
-    v.rotation.x=-Math.PI/2; v.position.set(c,.016,0); scene.add(v);
+    layer(new THREE.PlaneGeometry(1120,7), 0x4a8fc7, 0, .015, c, -8);
+    layer(new THREE.PlaneGeometry(7,1120), 0x4a8fc7, c, .016, 0, -8);
+  }
+  for(const r of CFG.roads){
+    layer(new THREE.PlaneGeometry(1120,10), 0x54585d, 0, .02, r, -7);
+    layer(new THREE.PlaneGeometry(10,1120), 0x54585d, r, .021, 0, -7);
+  }
+  for(const r of CFG.roads){
+    layer(new THREE.PlaneGeometry(1120,.5), 0xcfd3d8, 0, .03, r, -6);
+    layer(new THREE.PlaneGeometry(.5,1120), 0xcfd3d8, r, .031, 0, -6);
   }
 })();
 
@@ -237,6 +307,7 @@ function addHouse(x,z,w=8,d=7,h=5,wall=0xa5623b,roof=0x7a3b2e){
   rf.rotation.y = Math.PI/4; rf.position.set(x, h + h*.31, z); scene.add(rf);
   boxColliders.push({x, z, hw:w/2+.15, hd:d/2+.15});
   losBlockers.push(walls);
+  camBlockers.push(walls, rf);
 }
 addHouse(-300,-180);            addHouse(-300,-156,12,8,6,0x3c6e47,0x2f3338); // boerderij + schuur
 addHouse(60,-300,9,7,5);        addHouse(300,60,8,7,5,0xc9c1b4,0x5a5f66);
@@ -260,8 +331,25 @@ const windmillHub = (function(){
   }
   g.add(hub);
   g.position.set(180,0,180); scene.add(g);
-  circleColliders.push({x:180,z:180,r:3.4}); losBlockers.push(base);
+  circleColliders.push({x:180,z:180,r:3.4}); losBlockers.push(base); camBlockers.push(base, cap);
   return hub;
+})();
+
+// busje op het droppunt, in de berm naast de weg (vóór de bomen, zodat die er niet in groeien)
+(function(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.5,2.3,6), lam(0xd8d8de));
+  body.position.y=1.55; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.5,1.4,1.6), lam(0x2c3138));
+  cab.position.set(0,1.5,3.2); g.add(cab);
+  for(const [wx,wz] of [[-1.25,2.1],[1.25,2.1],[-1.25,-2.1],[1.25,-2.1]]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.35,10), lam(0x111));
+    w.rotation.z=Math.PI/2; w.position.set(wx,.5,wz); g.add(w);
+  }
+  g.add(blob(2.4));
+  g.position.set(-128,0,-312); scene.add(g);
+  boxColliders.push({x:-128,z:-312,hw:1.5,hd:3.2});
+  losBlockers.push(body); camBlockers.push(body);
 })();
 
 function randField(margin=9, tries=200){
@@ -277,49 +365,40 @@ function randField(margin=9, tries=200){
   return {x:rand(-400,400), z:rand(-400,400)};
 }
 
+const treeGeo = {
+  trunk: new THREE.CylinderGeometry(.28,.44,2.7,8),
+  c1: new THREE.SphereGeometry(1.9,10,8),
+  c2: new THREE.SphereGeometry(1.25,9,7),
+};
 for(let i=0;i<58;i++){ // bomen
   const p = randField();
   const g = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.28,.44,2.7,8), lam(0x7a5230));
+  const trunk = new THREE.Mesh(treeGeo.trunk, lam(0x7a5230));
   trunk.position.y = 1.35; g.add(trunk);
-  const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.9,10,8), lam(0x3e7d3a));
+  const c1 = new THREE.Mesh(treeGeo.c1, lam(0x3e7d3a));
   c1.position.y = 3.7; g.add(c1);
-  const c2 = new THREE.Mesh(new THREE.SphereGeometry(1.25,9,7), lam(0x468a41));
+  const c2 = new THREE.Mesh(treeGeo.c2, lam(0x468a41));
   c2.position.y = 5.0; g.add(c2);
   g.position.set(p.x,0,p.z); scene.add(g);
-  losBlockers.push(c1);
+  // de kroon hangt boven de zichtlijn (y 1,3-1,7); de stam blokkeert wel
+  losBlockers.push(trunk);
   circleColliders.push({x:p.x, z:p.z, r:.75});
 }
+const bushGeo = new THREE.SphereGeometry(1.55,9,7);
 for(let i=0;i<44;i++){ // struiken (verstopplekken)
   const p = randField(8);
-  const b = new THREE.Mesh(new THREE.SphereGeometry(1.55,9,7), lam(0x2f5d33));
+  const b = new THREE.Mesh(bushGeo, lam(0x2f5d33));
   b.scale.y=.55; b.position.set(p.x,.8,p.z); scene.add(b);
   bushes.push(p);
 }
+const drinkGeo = new THREE.BoxGeometry(.55,.95,.55);
+const drinkMat = new THREE.MeshLambertMaterial({color:0xffd23f, emissive:0x6b4e00});
 for(let i=0;i<5;i++){ // energiedrank
   const p = randField();
-  const m = new THREE.Mesh(new THREE.BoxGeometry(.55,.95,.55),
-    new THREE.MeshLambertMaterial({color:0xffd23f, emissive:0x6b4e00}));
+  const m = new THREE.Mesh(drinkGeo, drinkMat);
   m.position.set(p.x,1,p.z); scene.add(m);
   drinks.push({x:p.x, z:p.z, m, done:false});
 }
-
-// busje op het droppunt
-(function(){
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.5,2.3,6), lam(0xd8d8de));
-  body.position.y=1.55; g.add(body);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.5,1.4,1.6), lam(0x2c3138));
-  cab.position.set(0,1.5,3.2); g.add(cab);
-  for(const [wx,wz] of [[-1.25,2.1],[1.25,2.1],[-1.25,-2.1],[1.25,-2.1]]){
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.35,10), lam(0x111));
-    w.rotation.z=Math.PI/2; w.position.set(wx,.5,wz); g.add(w);
-  }
-  g.add(blob(2.4));
-  g.position.set(-120,0,-312); scene.add(g);
-  boxColliders.push({x:-120,z:-312,hw:1.5,hd:3.2});
-  losBlockers.push(body);
-})();
 
 function makeBikeMesh(){
   const g = new THREE.Group();
@@ -392,14 +471,15 @@ function makeHunter(x,z,axis){
   const fig = makeFigure(0x15181d, 0xdfb28c, 0x0c0e11); fig.visible=false; scene.add(fig);
   return {car, fig, mode:'drive', axis, x, z, fx:x, fz:z, carX:x, carZ:z,
           wps:[], routeT:-1, nextRoute:0, parkTgt:false,
-          sees:false, losT:0, searchUntil:0, searchX:0, searchZ:0, spawn:{x,z,axis}};
+          sees:false, losT:0, searchUntil:0, searchX:0, searchZ:0,
+          stuckT:0, detourT:0, detX:0, detZ:0, spawn:{x,z,axis}};
 }
 const HUNTER_SPAWNS = [[360,360,'v'],[-360,360,'h'],[360,-360,'h']];
 for(const s of HUNTER_SPAWNS) hunters.push(makeHunter(s[0],s[1],s[2]));
 
 /* ---------- botsingen ---------- */
 function collideEntity(p, r){
-  p.x = clamp(p.x, -470, 470); p.z = clamp(p.z, -470, 470);
+  p.x = clamp(p.x, -CFG.worldEdge, CFG.worldEdge); p.z = clamp(p.z, -CFG.worldEdge, CFG.worldEdge);
   for(const b of boxColliders){
     const dx=p.x-b.x, dz=p.z-b.z;
     if(Math.abs(dx)<b.hw+r && Math.abs(dz)<b.hd+r){
@@ -413,14 +493,20 @@ function collideEntity(p, r){
   }
 }
 
+/* ---------- opslag (kan ontbreken: privévenster, geblokkeerde cookies) ---------- */
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('voortvluchtig.'+k); return v===null? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('voortvluchtig.'+k, JSON.stringify(v)); } catch(e){} },
+};
+
 /* ---------- audio ---------- */
-let AC=null, spotCd=0;
+let AC=null, spotCd=0, muted=!!store.get('muted', false);
 function initAudio(){
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
   if(AC && AC.state==='suspended') AC.resume();
 }
 function sfx(f, dur=.12, type='square', g=.15, slide){
-  if(!AC) return;
+  if(!AC || muted) return;
   const t=AC.currentTime, o=AC.createOscillator(), ga=AC.createGain();
   o.type=type; o.frequency.setValueAtTime(f,t);
   if(slide) o.frequency.exponentialRampToValueAtTime(slide, t+dur);
@@ -442,7 +528,14 @@ function msg(t, calm){
   setTimeout(()=>d.classList.add('out'), 2100);
   setTimeout(()=>d.remove(), 2600);
 }
-const miniCtx = $('mini').getContext('2d'); miniCtx.scale(2,2);
+// minikaart scherp op elk scherm: backing store op de echte pixeldichtheid (max 3x)
+const miniCtx = $('mini').getContext('2d');
+function sizeMini(){
+  const r = Math.min(3, Math.max(1, window.devicePixelRatio||1));
+  $('mini').width = $('mini').height = Math.round(132*r);
+  miniCtx.setTransform(r,0,0,r,0,0);
+}
+sizeMini();
 function drawMini(){
   const c=miniCtx, S=132, M=v=>(v+CFG.mapHalf)*(S/(CFG.mapHalf*2));
   c.fillStyle='#12271b'; c.fillRect(0,0,S,S);
@@ -472,14 +565,47 @@ function drawMini(){
 }
 
 /* ---------- input ---------- */
+// Beweging op fysieke toetspositie (e.code): WASD werkt zo ook op AZERTY en QWERTZ.
+const MOVE_KEYS = {KeyW:'up', ArrowUp:'up', KeyS:'down', ArrowDown:'down',
+                   KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right',
+                   ShiftLeft:'sprint', ShiftRight:'sprint'};
 const keys = {};
+const isKey = (e, code, letter) => e.code===code || (e.key||'').toLowerCase()===letter;
+function clearInput(){
+  for(const k in keys) keys[k]=false;
+  sprintHold=false; btnSprint.classList.remove('on'); mDown=false;
+  joy.id=-1; joy.active=false; joy.x=0; joy.y=0; joyBase.style.display='none'; lookId=-1;
+}
 addEventListener('keydown', e=>{
-  const k=e.key.toLowerCase(); keys[k]=true;
-  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
-  if(!e.repeat && k==='c') toggleCrouch();
-  if(!e.repeat && k==='e') doAction();
+  if(!e.repeat && isKey(e,'KeyM','m')) toggleMute();
+  if(!e.repeat && (e.code==='Escape' || isKey(e,'KeyP','p'))){
+    if(state==='play'){ pauseGame(); e.preventDefault(); return; }
+    if(state==='paused'){ resumeGame(); e.preventDefault(); return; }
+  }
+  if(state==='paused'){
+    if(e.code==='Enter' || e.code==='NumpadEnter'){ resumeGame(); e.preventDefault(); }
+    return;
+  }
+  if(state!=='play'){
+    // op start- en eindscherm: Enter start; Spatie laten we aan de gefocuste knop
+    if(e.code==='Enter' || e.code==='NumpadEnter'){
+      if(state==='menu') startGame(); else if(state==='over') retryGame();
+      e.preventDefault();
+    }
+    return;
+  }
+  const a = MOVE_KEYS[e.code];
+  if(a){ keys[a]=true; e.preventDefault(); }
+  if(e.code==='Space') e.preventDefault();
+  if(e.repeat) return;
+  if(isKey(e,'KeyC','c')) toggleCrouch();
+  if(isKey(e,'KeyE','e')) doAction();
 });
-addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+addEventListener('keyup', e=>{ const a = MOVE_KEYS[e.code]; if(a) keys[a]=false; });
+// een toets die ingedrukt is tijdens alt-tab of tabwissel mag niet blijven "hangen";
+// wie wegklikt of van tabblad wisselt, vindt het spel gepauzeerd terug
+addEventListener('blur', ()=>{ clearInput(); if(state==='play') pauseGame(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ clearInput(); if(state==='play') pauseGame(); } });
 addEventListener('contextmenu', e=>e.preventDefault());
 addEventListener('gesturestart', e=>e.preventDefault());
 
@@ -596,10 +722,11 @@ function driveStep(h, dt){
     h.mode='foot'; h.carX=h.x; h.carZ=h.z; h.fx=h.x; h.fz=h.z;
     h.fig.visible=true; h.searchUntil=0;
   }
-  if(dist(h.x,h.z,player.x,player.z)<2.2) endGame(false);
+  if(dist(h.x,h.z,player.x,player.z)<CFG.carCatchR) endGame(false);
 }
 function footStep(h, dt){
   let tx=intel.x, tz=intel.z;
+  if(h.sees) h.searchUntil=0; // opnieuw gezien: stop met zoeken, direct achtervolgen
   if(h.searchUntil>0){
     if(tNow>h.searchUntil){h.mode='return'; h.searchUntil=0; return;}
     tx=h.searchX; tz=h.searchZ;
@@ -624,14 +751,48 @@ function returnStep(h, dt){
     h.mode='drive'; h.fig.visible=false; h.wps=[]; h.routeT=-1; h.parkTgt=false;
   }
 }
+// dichtstbijzijnde obstakel (middelpunt), om te bepalen langs welke kant een jager eromheen loopt
+function nearestObstacle(x, z){
+  let best=null, bd=1e9;
+  for(const b of boxColliders){
+    const d = Math.max(Math.abs(x-b.x)-b.hw, Math.abs(z-b.z)-b.hd, 0);
+    if(d<bd){bd=d; best=b;}
+  }
+  for(const c of circleColliders){
+    const d = Math.max(dist(x,z,c.x,c.z)-c.r, 0);
+    if(d<bd){bd=d; best=c;}
+  }
+  return bd<1.5? best : null;
+}
 function moveFoot(h, tx, tz, dt){
   const wm = inWater(h.fx,h.fz)? CFG.waterMul : 1;
   const dx=tx-h.fx, dz=tz-h.fz, d=Math.hypot(dx,dz)||1;
+  let ux=dx/d, uz=dz/d;
+  if(tNow<h.detourT){ // even zijwaarts langs het obstakel, met een beetje voorwaarts
+    ux = ux*.35 + h.detX; uz = uz*.35 + h.detZ;
+    const l=Math.hypot(ux,uz)||1; ux/=l; uz/=l;
+  }
   const st=Math.min(CFG.footSpeed*wm*dt, d);
-  h.fx+=dx/d*st; h.fz+=dz/d*st;
+  const ox=h.fx, oz=h.fz;
+  h.fx+=ux*st; h.fz+=uz*st;
   const p={x:h.fx, z:h.fz}; collideEntity(p,.55); h.fx=p.x; h.fz=p.z;
+  // Rechtstreeks op een doel achter een muur of stam af lopen is een evenwicht waarin de
+  // botsing elke stap terugduwt. Merkt de jager dat hij amper vooruitkomt, dan wijkt hij uit.
+  const moved = Math.hypot(h.fx-ox, h.fz-oz);
+  if(st>1e-3 && moved < st*.35) h.stuckT += dt; else h.stuckT = Math.max(0, h.stuckT-dt);
+  if(h.stuckT>.4 && tNow>=h.detourT){
+    const px=-dz/d, pz=dx/d; // loodrecht op de looprichting
+    const prevSide = Math.sign(h.detX*px + h.detZ*pz) || 1;
+    let side;
+    if(h.detourT>0 && tNow-h.detourT<1) side = -prevSide; // net uitgeweken en weer vast: andere kant
+    else {
+      const ob=nearestObstacle(h.fx,h.fz); // anders langs de kant die het dichtst bij de hoek ligt
+      side = (ob && Math.sign((h.fx-ob.x)*px + (h.fz-ob.z)*pz)) || -prevSide;
+    }
+    h.detX=px*side; h.detZ=pz*side; h.detourT=tNow+1.2; h.stuckT=0;
+  }
   h.fig.position.set(h.fx, inWater(h.fx,h.fz)?-.4:0, h.fz);
-  h.fig.rotation.y=Math.atan2(dx,dz);
+  h.fig.rotation.y=Math.atan2(ux,uz);
 }
 function senseStep(h){
   if(tNow<h.losT) return; h.losT=tNow+.15;
@@ -660,9 +821,13 @@ function senseStep(h){
 let state='menu', tNow=0, timeLeft=CFG.surviveTime, nextPing=CFG.pingInterval,
     pings=0, seenFlash=-9, hiddenNow=false;
 
+function setState(s){
+  state=s;
+  document.body.classList.toggle('playing', s==='play');
+}
 function reset(){
   player.x=SPAWN.x; player.z=SPAWN.z; player.rot=0; player.stam=CFG.stamMax;
-  player.crouch=false; player.boostT=-9;
+  player.crouch=false; player.boostT=-9; player.tired=false;
   if(player.bike) player.bike=null;
   btnHide.classList.remove('on'); btnSprint.classList.remove('on'); sprintHold=false;
   for(const b of bikes){b.taken=false; b.x=b.hx; b.z=b.hz; b.g.position.set(b.x,0,b.z);}
@@ -673,15 +838,15 @@ function reset(){
     h.mode='drive'; h.x=h.spawn.x; h.z=h.spawn.z; h.axis=h.spawn.axis;
     h.fx=h.x; h.fz=h.z; h.carX=h.x; h.carZ=h.z;
     h.wps=[]; h.routeT=-1; h.nextRoute=0; h.parkTgt=false; h.sees=false;
-    h.searchUntil=0; h.losT=0;
-    h.car.position.set(h.x,0,h.z); h.fig.visible=false;
+    h.searchUntil=0; h.losT=0; h.stuckT=0; h.detourT=0; h.detX=0; h.detZ=0;
+    h.car.position.set(h.x,0,h.z); h.car.rotation.y=0; h.fig.visible=false;
   });
   camYaw=Math.PI*.15; camPitch=.42;
 }
 function fmt(s){s=Math.max(0,Math.ceil(s)); return `${(s/60)|0}:${String(s%60).padStart(2,'0')}`;}
 function endGame(win){
   if(state!=='play') return;
-  state='over';
+  setState('over');
   $('endEyebrow').textContent = win? 'Uitzending afgelopen · jij wint':'Uitzending afgelopen';
   $('endTitle').innerHTML = win? 'Ont<span>snapt!</span> 🏆':'Ge<span>pakt!</span> 🚔';
   const survived=CFG.surviveTime-timeLeft;
@@ -691,28 +856,59 @@ function endGame(win){
   $('endScr').style.display='flex';
   win? sfxWin(): sfxLose();
 }
-$('btnStart').addEventListener('click', ()=>{
-  initAudio(); reset(); $('startScr').style.display='none'; state='play';
+function startGame(){
+  initAudio(); reset(); $('startScr').style.display='none'; setState('play');
   msg('🏃 Rennen! Ze kennen je droppunt', true);
-});
-$('btnRetry').addEventListener('click', ()=>{
-  initAudio(); reset(); $('endScr').style.display='none'; state='play';
+}
+function retryGame(){
+  initAudio(); reset(); $('endScr').style.display='none'; setState('play');
   msg('🏃 Nieuwe poging — succes', true);
-});
+}
+function pauseGame(){
+  if(state!=='play') return;
+  setState('paused'); clearInput();
+  $('pauseScr').style.display='flex';
+  $('btnResume').focus({preventScroll:true});
+}
+function resumeGame(){
+  if(state!=='paused') return;
+  $('pauseScr').style.display='none'; setState('play');
+  initAudio(); clock.getDelta(); // pauzetijd telt niet mee
+}
+function quitGame(){
+  $('pauseScr').style.display='none'; $('endScr').style.display='none';
+  setState('menu'); clearInput();
+  $('startScr').style.display='flex';
+}
+function toggleMute(){
+  muted=!muted; store.set('muted', muted);
+  $('btnMute').textContent = muted? '🔇 Geluid: uit' : '🔊 Geluid: aan';
+}
+$('btnMute').textContent = muted? '🔇 Geluid: uit' : '🔊 Geluid: aan';
+$('btnStart').addEventListener('click', startGame);
+$('btnRetry').addEventListener('click', retryGame);
+$('btnResume').addEventListener('click', resumeGame);
+$('btnQuit').addEventListener('click', quitGame);
+$('btnMute').addEventListener('click', toggleMute);
+press($('btnPause'), ()=>pauseGame());
 
 /* ---------- speler-update ---------- */
 function playerStep(dt){
   let ix=0, iy=0;
   if(joy.active){ix=joy.x; iy=joy.y;}
   else {
-    if(keys['w']||keys['arrowup']) iy+=1;
-    if(keys['s']||keys['arrowdown']) iy-=1;
-    if(keys['d']||keys['arrowright']) ix+=1;
-    if(keys['a']||keys['arrowleft']) ix-=1;
+    if(keys.up) iy+=1;
+    if(keys.down) iy-=1;
+    if(keys.right) ix+=1;
+    if(keys.left) ix-=1;
   }
   const len=Math.hypot(ix,iy); if(len>1){ix/=len; iy/=len;}
   const moving=len>.08;
-  const sprinting=(sprintHold||keys['shift']) && player.stam>0 && moving && !player.crouch && !player.bike;
+  // Uitgeput (conditie 0) = pas weer sprinten vanaf CFG.stamRecover. Zonder die drempel wisselen
+  // herstel en verbruik elkaar per frame af en sprint je eindeloos op ~8 m/s door.
+  if(player.stam<=0) player.tired=true;
+  else if(player.stam>=CFG.stamRecover) player.tired=false;
+  const sprinting=(sprintHold||keys.sprint) && !player.tired && moving && !player.crouch && !player.bike;
   let spd = player.bike? CFG.bike : player.crouch? CFG.crouch : sprinting? CFG.sprint : CFG.walk;
   if(tNow<player.boostT) spd*=1.3;
   const wet=inWater(player.x,player.z);
@@ -747,7 +943,10 @@ function playerStep(dt){
     if(!b.taken && dist(b.x,b.z,player.x,player.z)<3){nearBike=b; break;}
   const showAct = !!player.bike || !!nearBike;
   btnAct.classList.toggle('hiddenB', !showAct);
-  btnAct.classList.toggle('on', !!player.bike);
+  if(btnAct.classList.contains('on') !== !!player.bike){
+    btnAct.classList.toggle('on', !!player.bike);
+    btnAct.setAttribute('aria-label', player.bike? 'Afstappen' : 'Fiets pakken');
+  }
 }
 
 /* ---------- hoofdlus ---------- */
@@ -799,26 +998,39 @@ function animate(){
       tm.classList.toggle('low', timeLeft<30);
       $('pingT').textContent=`📍 volgende deling: ${Math.ceil(Math.max(0,nextPing))}s`;
       const sf=$('stamFill');
-      sf.style.width=player.stam+'%';
+      sf.style.width=(player.stam/CFG.stamMax*100)+'%';
       sf.classList.toggle('boost', tNow<player.boostT);
+      sf.classList.toggle('tired', player.tired);
       $('hideChip').style.display=hiddenNow?'block':'none';
       drawMini();
     }
   }
 
-  const cx=player.x+Math.sin(camYaw)*Math.cos(camPitch)*camDist;
-  const cz=player.z+Math.cos(camYaw)*Math.cos(camPitch)*camDist;
-  const cy=1.6+Math.sin(camPitch)*camDist;
-  camera.position.set(cx,cy,cz);
+  // camera: kijkt niet door huizen heen; springt direct naar voren, glijdt rustig terug
+  tmpA.set(player.x,1.7,player.z);
+  tmpB.set(Math.sin(camYaw)*Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw)*Math.cos(camPitch));
+  camRay.set(tmpA,tmpB); camRay.far=camDist;
+  const hit=camRay.intersectObjects(camBlockers,false)[0];
+  const want = hit? Math.max(.1, hit.distance-.6) : camDist;
+  camEff = want<camEff ? want : camEff+(want-camEff)*Math.min(1,dt*3);
+  pMesh.visible = camEff>1.1; // pal tegen een muur: even (bijna) eerstepersoons, zonder eigen poppetje in beeld
+  camera.position.set(player.x+tmpB.x*camEff, 1.7+tmpB.y*camEff, player.z+tmpB.z*camEff);
   camera.lookAt(player.x,1.7,player.z);
   renderer.render(scene,camera);
 }
+const camRay = new THREE.Raycaster();
+let camEff = camDist;
 animate();
+
+// alles staat klaar: nu pas mag de startknop aan
+$('btnStart').disabled = false;
+$('btnStart').textContent = '▶ Start de ontsnapping';
 
 addEventListener('resize', ()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
+  sizeMini();
 });
 </script>
 </body>
