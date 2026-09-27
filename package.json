@@ -1,10 +1,14 @@
 {
   "name": "voortvluchtig",
   "private": true,
-  "description": "3D ontsnappingsgame voor de browser. De game zelf heeft geen build-stap; dit bestand is alleen voor de tests.",
+  "description": "3D ontsnappingsgame voor de browser. De game zelf heeft geen build-stap; dit bestand is alleen voor lokaal spelen en de tests.",
   "scripts": {
     "start": "node tests/server.mjs",
-    "test": "playwright test"
+    "setup": "playwright install chromium webkit firefox",
+    "test": "playwright test",
+    "test:snel": "playwright test --project=desktop",
+    "site": "node tools/build-site.mjs",
+    "og-image": "node tools/og-image.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

@@ -1,0 +1,21 @@
+{
+  "toelichting": "Referentie voor tests/balance.spec.js. Gemeten op 27 september 2026 met 12 vaste kaarten (seeds 1-12). De originele versie uit de zip gaf op Normaal dezelfde waarden voor 'stil' en 'vlucht' (5/12 gewonnen, mediaan 135 s). Pas deze waarden aan als je de balans bewust verandert.",
+  "seeds": 12,
+  "niveaus": {
+    "makkelijk": {
+      "stilGepaktNa": 64.5,
+      "vluchtGewonnen": 4,
+      "vluchtMediaan": 159.05
+    },
+    "normaal": {
+      "stilGepaktNa": 58.1,
+      "vluchtGewonnen": 5,
+      "vluchtMediaan": 130.45
+    },
+    "moeilijk": {
+      "stilGepaktNa": 52.8,
+      "vluchtGewonnen": 5,
+      "vluchtMediaan": 82.3
+    }
+  }
+}

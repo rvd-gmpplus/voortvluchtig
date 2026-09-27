@@ -74,9 +74,9 @@ function harnessScript() {
 
   function setPlay(s) { if (typeof setState === 'function') setState(s); else state = s; }
 
-  function run(kind, reseed, dt = 1 / 30) {
+  function run(kind, reseed, level = 'normaal', dt = 1 / 30) {
     if (window.__reseed) window.__reseed(reseed);
-    if (typeof applyDifficulty === 'function') applyDifficulty('normaal');
+    if (typeof applyDifficulty === 'function') applyDifficulty(level);
     reset(); camYaw = 0;
     setPlay('play');
     const max = Math.ceil(CFG.surviveTime / dt) + 5;

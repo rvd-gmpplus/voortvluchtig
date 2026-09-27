@@ -1,45 +1,61 @@
 // @ts-check
-// Balanswacht voor moeilijkheid Normaal. Speelt op 12 vaste kaarten (seeds) hele potjes versneld na
-// met twee bots en controleert dat de uitkomst binnen een band blijft.
+// Balanswacht. Speelt op 12 vaste kaarten (seeds) hele potjes versneld na met twee bots, op alle drie
+// de niveaus, en schrijft de uitkomst naar de job-samenvatting in GitHub Actions.
 //
-// Referentie (27 september 2026, 12 seeds): de oorspronkelijke versie uit de zip en deze versie gaven
-// allebei stilstaan = gepakt na 58,1 s en vluchten = 5 van 12 gewonnen (mediaan 135 s oud, 130 s nieuw).
-// Faalt deze test na een CFG-aanpassing, dan is Normaal merkbaar makkelijker of moeilijker geworden.
-// Is dat de bedoeling, pas dan de banden hieronder aan en noteer de nieuwe referentie.
+// - Rood (blokkeert de deploy) alleen als het spel kapot is: een niveau is onwinbaar of altijd
+//   gewonnen, je wordt vrijwel direct op het droppunt gepakt, of Makkelijk/Normaal/Moeilijk staan
+//   niet meer in de goede volgorde.
+// - Waarschuwing (blokkeert niet) als Normaal duidelijk afwijkt van tests/balance.json. Zo kun je de
+//   balans bewust bijstellen via CFG; werk daarna balance.json bij met de nieuwe waarden.
+const fs = require('node:fs');
 const { test, expect } = require('@playwright/test');
 const { seedScript, harnessScript } = require('./balance-harness');
+const REF = require('./balance.json');
 
-const SEEDS = Array.from({ length: 12 }, (_, i) => i + 1);
-const BANDS = {
-  stilGepaktNa: [40, 90],        // seconden; referentie 58,1
-  vluchtGewonnen: [3, 8],        // van de 12; referentie 5
-  vluchtMediaan: [90, 220],      // seconden; referentie 130
-};
-
+const LEVELS = ['makkelijk', 'normaal', 'moeilijk'];
 const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
-test('balans Normaal blijft binnen de referentieband', async ({ browser }, info) => {
-  test.skip(info.project.name === 'mobiel', 'simulatie is apparaatonafhankelijk; één keer draaien volstaat');
-  test.setTimeout(180_000);
-  const stil = [], vlucht = [];
-  for (const seed of SEEDS) {
+test('balans: alle niveaus speelbaar, in de goede volgorde, Normaal dicht bij de referentie', async ({ browser }, info) => {
+  test.skip(info.project.name !== 'desktop', 'simulatie is apparaatonafhankelijk; één keer draaien volstaat');
+  test.setTimeout(300_000);
+  const raw = Object.fromEntries(LEVELS.map((l) => [l, { stil: [], vlucht: [] }]));
+  for (let seed = 1; seed <= REF.seeds; seed++) {
     const page = await browser.newPage();
     await page.addInitScript(seedScript, seed);
     await page.goto('/');
     await expect(page.locator('#btnStart')).toBeEnabled();
     await page.evaluate(harnessScript);
-    stil.push(await page.evaluate((s) => window.__balans.run('stil', s), seed * 10 + 1));
-    vlucht.push(await page.evaluate((s) => window.__balans.run('vlucht', s), seed * 10 + 2));
+    for (const level of LEVELS) {
+      raw[level].stil.push(await page.evaluate(([s, l]) => window.__balans.run('stil', s, l), [seed * 10 + 1, level]));
+      raw[level].vlucht.push(await page.evaluate(([s, l]) => window.__balans.run('vlucht', s, l), [seed * 10 + 2, level]));
+    }
     await page.close();
   }
-  const stilT = median(stil.map((r) => r.t));
-  const wins = vlucht.filter((r) => r.won).length;
-  const vluchtT = median(vlucht.map((r) => r.t));
-  console.log(`balans Normaal: stil gepakt na ${stilT} s, vlucht ${wins}/12 gewonnen, mediaan ${vluchtT} s`);
-  expect(stilT).toBeGreaterThanOrEqual(BANDS.stilGepaktNa[0]);
-  expect(stilT).toBeLessThanOrEqual(BANDS.stilGepaktNa[1]);
-  expect(wins).toBeGreaterThanOrEqual(BANDS.vluchtGewonnen[0]);
-  expect(wins).toBeLessThanOrEqual(BANDS.vluchtGewonnen[1]);
-  expect(vluchtT).toBeGreaterThanOrEqual(BANDS.vluchtMediaan[0]);
-  expect(vluchtT).toBeLessThanOrEqual(BANDS.vluchtMediaan[1]);
+  const m = Object.fromEntries(LEVELS.map((l) => [l, {
+    stilGepaktNa: median(raw[l].stil.map((r) => r.t)),
+    vluchtGewonnen: raw[l].vlucht.filter((r) => r.won).length,
+    vluchtMediaan: median(raw[l].vlucht.map((r) => r.t)),
+  }]));
+
+  const rows = LEVELS.map((l) => `| ${l} | ${m[l].stilGepaktNa} s | ${m[l].vluchtGewonnen}/${REF.seeds} | ${m[l].vluchtMediaan} s |`);
+  const table = ['### Balans (bots, 12 vaste kaarten)', '', '| Niveau | Stilstaan: gepakt na | Vluchten: gewonnen | Vluchten: mediaan overleefd |', '|---|---|---|---|', ...rows, ''].join('\n');
+  console.log(table);
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, table + '\n');
+
+  const ref = REF.niveaus.normaal, n = m.normaal;
+  const drift = [];
+  if (Math.abs(n.vluchtGewonnen - ref.vluchtGewonnen) >= 3) drift.push(`vluchten gewonnen ${n.vluchtGewonnen} (referentie ${ref.vluchtGewonnen})`);
+  if (Math.abs(n.stilGepaktNa - ref.stilGepaktNa) > 15) drift.push(`stilstaan gepakt na ${n.stilGepaktNa} s (referentie ${ref.stilGepaktNa} s)`);
+  if (Math.abs(n.vluchtMediaan - ref.vluchtMediaan) > 60) drift.push(`vluchten mediaan ${n.vluchtMediaan} s (referentie ${ref.vluchtMediaan} s)`);
+  if (drift.length) console.log(`::warning title=Balans Normaal verschoven::${drift.join('; ')}. Bewust? Werk tests/balance.json bij.`);
+
+  for (const l of LEVELS) {
+    expect(m[l].vluchtGewonnen, `${l}: vluchten is nooit te winnen`).toBeGreaterThan(0);
+    expect(m[l].vluchtGewonnen, `${l}: vluchten wint altijd`).toBeLessThan(REF.seeds);
+    expect(m[l].stilGepaktNa, `${l}: je wordt vrijwel direct gepakt`).toBeGreaterThanOrEqual(15);
+  }
+  expect(m.makkelijk.vluchtMediaan, 'Makkelijk is niet makkelijker dan Normaal').toBeGreaterThanOrEqual(m.normaal.vluchtMediaan);
+  expect(m.normaal.vluchtMediaan, 'Moeilijk is niet moeilijker dan Normaal').toBeGreaterThanOrEqual(m.moeilijk.vluchtMediaan);
+  expect(m.makkelijk.stilGepaktNa).toBeGreaterThanOrEqual(m.normaal.stilGepaktNa);
+  expect(m.normaal.stilGepaktNa).toBeGreaterThanOrEqual(m.moeilijk.stilGepaktNa);
 });

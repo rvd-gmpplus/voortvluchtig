@@ -1,0 +1,93 @@
+# Test de game en publiceer hem op GitHub Pages.
+#
+# Eenmalig nodig: Settings > Pages > Build and deployment > Source = "GitHub Actions".
+# Kies NIET "Deploy from a branch": dan publiceert GitHub zonder deze tests en wordt de deploy-job rood.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1' # elke maandag: publiceert vanzelf zodra Pages aan staat en toont drift van runner of afhankelijkheden
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit firefox
+      - name: Stel de gepubliceerde map samen
+        run: node tools/build-site.mjs
+      - name: Test precies die map
+        run: npx playwright test
+        env:
+          SITE_DIR: _site
+      - name: Pages-status (informatief)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          t=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null) || t="uit"
+          echo "Pages-status: \`$t\` (nodig: \`workflow\`)" >> "$GITHUB_STEP_SUMMARY"
+      - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Voorcontrole Pages-instelling
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          t=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null) || t="uit"
+          if [ "$t" = "uit" ]; then
+            echo "::error::GitHub Pages staat uit. Zet Settings > Pages > Source op 'GitHub Actions' en start daarna Actions > Pages > Run workflow."
+            exit 1
+          fi
+          if [ "$t" != "workflow" ]; then
+            echo "::error::GitHub Pages publiceert vanuit een branch ($t); daarmee valt de testpoort weg. Zet Settings > Pages > Source op 'GitHub Actions'."
+            exit 1
+          fi
+      - uses: actions/configure-pages@v5
+      - name: Publiceer
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Livecheck (serveert de site deze commit?)
+        run: |
+          url="${{ steps.deployment.outputs.page_url }}versie.txt"
+          for i in $(seq 1 20); do
+            v=$(curl -fsS "$url?t=$RANDOM$i" 2>/dev/null | tr -d '[:space:]') || v=""
+            if [ "$v" = "$GITHUB_SHA" ]; then echo "Live: $url = $v"; exit 0; fi
+            sleep 15
+          done
+          echo "::error::De live site serveert na 5 minuten nog niet commit $GITHUB_SHA ($url gaf '$v')."
+          exit 1

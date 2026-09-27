@@ -6,6 +6,15 @@
 <title>VOORTVLUCHTIG — ontsnap aan de jagers</title>
 <meta name="description" content="3D-ontsnappingsgame in de browser: blijf vijf minuten uit handen van drie jagers in een Hollands polderlandschap. Werkt op mobiel en desktop.">
 <meta name="theme-color" content="#0b0d10">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="nl_NL">
+<meta property="og:title" content="VOORTVLUCHTIG — ontsnap aan de jagers">
+<meta property="og:description" content="3D-ontsnappingsgame in de browser. Blijf vijf minuten uit handen van de jagers in een Hollands polderlandschap.">
+<meta property="og:url" content="https://rvd-gmpplus.github.io/voortvluchtig/">
+<meta property="og:image" content="https://rvd-gmpplus.github.io/voortvluchtig/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ccircle cx='32' cy='32' r='17' fill='none' stroke='%23e5484d' stroke-width='6'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23ff7a1a'/%3E%3C/svg%3E">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -110,6 +119,18 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
   #vig{transition:none}
 }
 #endScr,#pauseScr{display:none}
+.levels{display:flex;gap:8px;margin:0 0 14px}
+.lvl{flex:1;padding:10px 6px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
+  color:#dde2e8;font-weight:800;font-size:13px;letter-spacing:.5px;cursor:pointer}
+.lvl[aria-pressed="true"]{background:#e5484d;border-color:#ff8f92;color:#fff}
+#best{font-size:12px;color:#9aa2ad;margin:-6px 0 14px;font-variant-numeric:tabular-nums}
+#fps{font-size:12px;color:#9aa2ad;margin:14px 0 0;font-variant-numeric:tabular-nums}
+.report{display:inline-block;margin-top:12px;font-size:13px;color:#ffb1b3}
+#errBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 60px);z-index:9;
+  display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;background:rgba(120,20,26,.94);
+  border:1px solid #ff8f92;font-size:12px;font-weight:700;max-width:92vw}
+#errBar a{color:#fff}
+#errBar button{background:none;border:0;color:#fff;font-size:16px;cursor:pointer;padding:0 2px}
 #endTitle{margin-bottom:2px}
 #endStats{font-size:14px;color:#c8ced6;margin:10px 0 18px;line-height:1.7;font-variant-numeric:tabular-nums}
 </style>
@@ -138,8 +159,8 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
     <h1>Voort<span>vluchtig</span></h1>
     <div class="sub">Eigen game geïnspireerd op het jachtconcept · niet gelieerd aan StukTV of Videoland</div>
     <ul class="rules">
-      <li><span class="ic">⏱</span><span><b>Blijf 5:00 uit handen van de jagers.</b> Word je aangetikt, dan is het klaar.</span></li>
-      <li><span class="ic">📍</span><span>Elke <b>45 sec</b> wordt je locatie gedeeld. De jagers kennen ook je droppunt.</span></li>
+      <li><span class="ic">⏱</span><span><b>Blijf <span id="ruleTime">5:00</span> uit handen van <span id="ruleHunters">drie</span> jagers.</b> Word je aangetikt, dan is het klaar.</span></li>
+      <li><span class="ic">📍</span><span>Elke <b><span id="rulePing">45</span> sec</b> wordt je locatie gedeeld. De jagers kennen ook je droppunt.</span></li>
       <li><span class="ic">🚗</span><span>Jagers rijden in zwarte auto's — <b>alleen over wegen</b>. Dichtbij stappen ze uit en jagen te voet.</span></li>
       <li><span class="ic">🌊</span><span><b>Sloten</b> oversteken is traag, maar auto's kunnen er niet langs. Gebruik ze.</span></li>
       <li><span class="ic">🌿</span><span>Buk bij <b>struiken</b> om vrijwel onzichtbaar te worden.</span></li>
@@ -148,6 +169,12 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
     </ul>
     <div class="ctrl">📱 <b>Mobiel:</b> linkerhelft = joystick · rechterhelft vegen = camera · knoppen rechtsonder<br>
       ⌨️ <b>Desktop:</b> WASD/pijltjes · Shift = sprint · C = bukken · E = fiets · muis slepen = camera · scroll = zoom · P/Esc = pauze · M = geluid</div>
+    <div class="levels" role="group" aria-label="Moeilijkheid">
+      <button type="button" class="lvl" data-level="makkelijk" aria-pressed="false">Makkelijk</button>
+      <button type="button" class="lvl" data-level="normaal" aria-pressed="true">Normaal</button>
+      <button type="button" class="lvl" data-level="moeilijk" aria-pressed="false">Moeilijk</button>
+    </div>
+    <div id="best"></div>
     <button id="btnStart" type="button" class="big" disabled>Laden…</button>
   </div>
 </div>
@@ -171,6 +198,7 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
       <button id="btnMute" type="button" class="big alt">🔊 Geluid: aan</button>
       <button id="btnQuit" type="button" class="big alt">✕ Stoppen</button>
     </div>
+    <div id="fps"></div>
   </div>
 </div>
 
@@ -180,8 +208,12 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
     <h1 id="errTitle">Spel kon niet laden</h1>
     <p id="errText"></p>
     <button type="button" class="big" onclick="location.reload()">↻ Pagina herladen</button>
+    <a id="errReport" class="report" href="https://github.com/rvd-gmpplus/voortvluchtig/issues/new?template=probleem.yml" target="_blank" rel="noopener">Blijft dit gebeuren? Meld het probleem</a>
   </div>
 </div>
+<div id="errBar" role="status"><span>Er ging iets mis in het spel.</span>
+  <a id="errBarLink" href="https://github.com/rvd-gmpplus/voortvluchtig/issues/new?template=probleem.yml" target="_blank" rel="noopener">Meld het probleem</a>
+  <button type="button" id="errBarClose" aria-label="Melding sluiten">✕</button></div>
 <noscript><div class="scr"><div class="card"><h1>JavaScript staat uit</h1><p style="font-size:14px;line-height:1.5;margin-top:10px">VOORTVLUCHTIG heeft JavaScript nodig. Zet het aan en herlaad de pagina.</p></div></div></noscript>
 
 <script src="vendor/three.min.js"></script>
@@ -204,6 +236,16 @@ const CFG = {
   catchR: 2.1, carCatchR: 2.2, exitDist: 34, intelFreshDrive: 26, intelLive: 4,
   stamMax: 100, stamDrain: 17, stamRegen: 11,
   stamRecover: 30,           // na uitputting pas weer sprinten vanaf deze conditie
+  hunters: 3,                // aantal jagers op Normaal (max. aantal spawnpunten: 3)
+  bushCount: 44,             // struiken op Normaal
+};
+
+// Moeilijkheid werkt als factor op CFG: pas je CFG aan, dan schuiven alle niveaus mee.
+// Normaal is precies CFG. De factoren voor Makkelijk en Moeilijk zijn startwaarden.
+const DIFF = {
+  makkelijk: {naam:'Makkelijk', jagers:-1, snelheid:.9,  ping:1.25, struiken:2},
+  normaal:   {naam:'Normaal',   jagers:0,  snelheid:1,   ping:1,    struiken:1},
+  moeilijk:  {naam:'Moeilijk',  jagers:0,  snelheid:1.1, ping:.8,   struiken:1},
 };
 
 /* ---------- helpers ---------- */
@@ -222,9 +264,15 @@ function inWater(x,z){
 }
 
 /* ---------- opstart: stop netjes als Three.js of WebGL ontbreekt ---------- */
+const ISSUE_URL = 'https://github.com/rvd-gmpplus/voortvluchtig/issues/new';
+function reportUrl(fout){
+  const q = new URLSearchParams({template:'probleem.yml', browser:navigator.userAgent, fout:String(fout||'').slice(0,300)});
+  return ISSUE_URL+'?'+q;
+}
 function fatal(title, text){
   $('errTitle').textContent = title;
   $('errText').textContent = text;
+  $('errReport').href = reportUrl(title);
   $('startScr').style.display = 'none';
   $('errScr').style.display = 'flex';
 }
@@ -232,9 +280,12 @@ if(!window.THREE){
   fatal('Spel kon niet laden', 'Het 3D-onderdeel (Three.js) is niet binnengekomen. Controleer je verbinding en herlaad de pagina.');
   throw new Error('VOORTVLUCHTIG: Three.js ontbreekt, spel gestopt');
 }
+// Op telefoons (grove aanwijzer) met een scherp scherm kost anti-aliasing veel en levert weinig op.
+const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+const DPR = window.devicePixelRatio||1;
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+  renderer = new THREE.WebGLRenderer({antialias: !(coarse && DPR>=2), powerPreference:'high-performance'});
 } catch(err){
   fatal('3D wordt niet ondersteund', 'Deze browser of dit apparaat kan geen WebGL starten. Probeer een recente versie van Chrome, Safari, Firefox of Edge, of zet hardwareversnelling aan.');
   throw err;
@@ -250,7 +301,7 @@ scene.background = new THREE.Color(0xbfd9ea);
 scene.fog = new THREE.Fog(0xbfd9ea, 130, 430);
 // near .5 en far net voorbij het einde van de mist: betere dieptenauwkeurigheid, zelfde beeld
 camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.5, 450);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.8));
+renderer.setPixelRatio(Math.min(DPR, coarse? 1.5 : 1.8));
 renderer.setSize(innerWidth, innerHeight);
 $('game').appendChild(renderer.domElement);
 clock = new THREE.Clock();
@@ -270,7 +321,8 @@ function blob(r){
 }
 
 /* ---------- wereld ---------- */
-const boxColliders=[], circleColliders=[], losBlockers=[], camBlockers=[], bushes=[], bikes=[], drinks=[];
+const boxColliders=[], circleColliders=[], losBlockers=[], camBlockers=[], allBushes=[], bikes=[], drinks=[];
+let bushes=[]; // actieve struiken (afhankelijk van moeilijkheid)
 
 (function buildGround(){
   // Platte grondlagen liggen vrijwel op dezelfde hoogte. In plaats van op de dieptebuffer te
@@ -370,27 +422,28 @@ const treeGeo = {
   c1: new THREE.SphereGeometry(1.9,10,8),
   c2: new THREE.SphereGeometry(1.25,9,7),
 };
+// Bomen en struiken zijn InstancedMeshes: één tekenaanroep per soort in plaats van één per exemplaar.
+// r128 berekent geen grens over alle exemplaren, dus frustum culling moet uit.
+function instanced(geo, color, list, y, sy=1){
+  const m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({color}), list.length);
+  const o = new THREE.Object3D();
+  list.forEach((p,i)=>{ o.position.set(p.x, y, p.z); o.scale.set(1, sy, 1); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
+  m.frustumCulled = false; scene.add(m);
+  return m;
+}
+const treePos = [];
 for(let i=0;i<58;i++){ // bomen
   const p = randField();
-  const g = new THREE.Group();
-  const trunk = new THREE.Mesh(treeGeo.trunk, lam(0x7a5230));
-  trunk.position.y = 1.35; g.add(trunk);
-  const c1 = new THREE.Mesh(treeGeo.c1, lam(0x3e7d3a));
-  c1.position.y = 3.7; g.add(c1);
-  const c2 = new THREE.Mesh(treeGeo.c2, lam(0x468a41));
-  c2.position.y = 5.0; g.add(c2);
-  g.position.set(p.x,0,p.z); scene.add(g);
-  // de kroon hangt boven de zichtlijn (y 1,3-1,7); de stam blokkeert wel
-  losBlockers.push(trunk);
+  treePos.push(p);
   circleColliders.push({x:p.x, z:p.z, r:.75});
 }
+const trunkMesh = instanced(treeGeo.trunk, 0x7a5230, treePos, 1.35);
+instanced(treeGeo.c1, 0x3e7d3a, treePos, 3.7);
+instanced(treeGeo.c2, 0x468a41, treePos, 5.0);
+// de kroon hangt boven de zichtlijn (y 1,3-1,7); de stam blokkeert wel
+losBlockers.push(trunkMesh);
 const bushGeo = new THREE.SphereGeometry(1.55,9,7);
-for(let i=0;i<44;i++){ // struiken (verstopplekken)
-  const p = randField(8);
-  const b = new THREE.Mesh(bushGeo, lam(0x2f5d33));
-  b.scale.y=.55; b.position.set(p.x,.8,p.z); scene.add(b);
-  bushes.push(p);
-}
+for(let i=0;i<CFG.bushCount;i++) allBushes.push(randField(8)); // struiken (verstopplekken)
 const drinkGeo = new THREE.BoxGeometry(.55,.95,.55);
 const drinkMat = new THREE.MeshLambertMaterial({color:0xffd23f, emissive:0x6b4e00});
 for(let i=0;i<5;i++){ // energiedrank
@@ -418,6 +471,11 @@ for(const [x,z] of [[-107,-306],[133,36],[-347,196]]){
   const g = makeBikeMesh(); g.position.set(x,0,z); g.rotation.y=rand(0,6.28); scene.add(g);
   bikes.push({x,z,hx:x,hz:z,g,taken:false});
 }
+// Extra struiken voor niveaus met meer dekking. Ze komen pas ná de rest van de wereld, zodat
+// Normaal exact dezelfde kaart houdt als zonder deze extra's.
+const maxBushes = Math.round(CFG.bushCount * Math.max(...Object.values(DIFF).map(d=>d.struiken)));
+for(let i=allBushes.length;i<maxBushes;i++) allBushes.push(randField(8));
+const bushMesh = instanced(bushGeo, 0x2f5d33, allBushes, .8, .55);
 
 function makeFigure(cloth, skin, hat){
   const g = new THREE.Group();
@@ -465,7 +523,8 @@ const pMesh = makeFigure(0xff7a1a, 0xe8b98f, 0xff7a1a); // oranje overall — de
 scene.add(pMesh);
 
 const intel = {x:SPAWN.x, z:SPAWN.z, t:0}; // wat de jagers weten
-let hunters = [];
+let hunters = []; // actieve jagers (afhankelijk van moeilijkheid)
+const allHunters = [];
 function makeHunter(x,z,axis){
   const car = makeCar(); car.position.set(x,0,z); scene.add(car);
   const fig = makeFigure(0x15181d, 0xdfb28c, 0x0c0e11); fig.visible=false; scene.add(fig);
@@ -475,7 +534,24 @@ function makeHunter(x,z,axis){
           stuckT:0, detourT:0, detX:0, detZ:0, spawn:{x,z,axis}};
 }
 const HUNTER_SPAWNS = [[360,360,'v'],[-360,360,'h'],[360,-360,'h']];
-for(const s of HUNTER_SPAWNS) hunters.push(makeHunter(s[0],s[1],s[2]));
+for(const s of HUNTER_SPAWNS) allHunters.push(makeHunter(s[0],s[1],s[2]));
+
+// Actuele waarden voor deze ronde: CFG maal de factoren van het gekozen niveau.
+const RUN = {level:'normaal', hunters:0, footSpeed:0, carSpeed:0, pingInterval:0, bushCount:0};
+function applyDifficulty(level){
+  const d = DIFF[level] || DIFF.normaal;
+  RUN.level = DIFF[level]? level : 'normaal';
+  RUN.hunters = clamp(CFG.hunters + d.jagers, 1, allHunters.length);
+  RUN.footSpeed = CFG.footSpeed * d.snelheid;
+  RUN.carSpeed = CFG.carSpeed * d.snelheid;
+  RUN.pingInterval = CFG.pingInterval * d.ping;
+  RUN.bushCount = clamp(Math.round(CFG.bushCount * d.struiken), 0, allBushes.length);
+  hunters = allHunters.slice(0, RUN.hunters);
+  allHunters.forEach((h,i)=>{ h.car.visible = i<RUN.hunters; if(i>=RUN.hunters) h.fig.visible=false; });
+  bushes = allBushes.slice(0, RUN.bushCount);
+  bushMesh.count = RUN.bushCount;
+}
+applyDifficulty('normaal');
 
 /* ---------- botsingen ---------- */
 function collideEntity(p, r){
@@ -619,7 +695,7 @@ const joyBase=$('joyBase'), joyKnob=$('joyKnob');
 
 addEventListener('touchstart', e=>{
   for(const t of e.changedTouches){
-    if(t.target.closest('.btn') || t.target.closest('.scr')) continue;
+    if(t.target.closest('.btn, .scr, #errBar')) continue;
     if(t.clientX < innerWidth*.45 && joy.id<0){
       joy.id=t.identifier; joy.active=true; joy.bx=t.clientX; joy.by=t.clientY; joy.x=0; joy.y=0;
       joyBase.style.display='block';
@@ -627,7 +703,7 @@ addEventListener('touchstart', e=>{
       joyKnob.style.transform='translate(-50%,-50%)';
     } else if(lookId<0){ lookId=t.identifier; lX=t.clientX; lY=t.clientY; }
   }
-  if(!e.target.closest('.scr')) e.preventDefault();
+  if(!e.target.closest('.scr, #errBar')) e.preventDefault();
 }, {passive:false});
 addEventListener('touchmove', e=>{
   for(const t of e.changedTouches){
@@ -642,7 +718,7 @@ addEventListener('touchmove', e=>{
       lX=t.clientX; lY=t.clientY;
     }
   }
-  if(!e.target.closest('.scr')) e.preventDefault();
+  if(!e.target.closest('.scr, #errBar')) e.preventDefault();
 }, {passive:false});
 function touchEnd(e){
   for(const t of e.changedTouches){
@@ -712,7 +788,7 @@ function driveStep(h, dt){
     const rx=CFG.roads[(Math.random()*4)|0], rz=CFG.roads[(Math.random()*4)|0];
     h.wps=carRoute(h, rx, rz); h.parkTgt=false;
   }
-  let step=CFG.carSpeed*dt;
+  let step=RUN.carSpeed*dt;
   while(step>0 && h.wps.length){
     const w=h.wps[0], dx=w.x-h.x, dz=w.z-h.z, d=Math.hypot(dx,dz);
     if(d>.01) h.axis = Math.abs(dx)>Math.abs(dz)?'h':'v';
@@ -775,7 +851,7 @@ function moveFoot(h, tx, tz, dt){
     ux = ux*.35 + h.detX; uz = uz*.35 + h.detZ;
     const l=Math.hypot(ux,uz)||1; ux/=l; uz/=l;
   }
-  const st=Math.min(CFG.footSpeed*wm*dt, d);
+  const st=Math.min(RUN.footSpeed*wm*dt, d);
   const ox=h.fx, oz=h.fz;
   h.fx+=ux*st; h.fz+=uz*st;
   const p={x:h.fx, z:h.fz}; collideEntity(p,.55); h.fx=p.x; h.fz=p.z;
@@ -821,7 +897,7 @@ function senseStep(h){
 }
 
 /* ---------- game state ---------- */
-let state='menu', tNow=0, timeLeft=CFG.surviveTime, nextPing=CFG.pingInterval,
+let state='menu', tNow=0, timeLeft=CFG.surviveTime, nextPing=RUN.pingInterval,
     pings=0, seenFlash=-9, hiddenNow=false;
 
 function setState(s){
@@ -836,7 +912,8 @@ function reset(){
   for(const b of bikes){b.taken=false; b.x=b.hx; b.z=b.hz; b.g.position.set(b.x,0,b.z);}
   for(const d of drinks){d.done=false; d.m.visible=true;}
   intel.x=SPAWN.x; intel.z=SPAWN.z; intel.t=0;
-  tNow=0; timeLeft=CFG.surviveTime; nextPing=CFG.pingInterval; pings=0; seenFlash=-9; spotCd=0;
+  applyDifficulty(RUN.level);
+  tNow=0; timeLeft=CFG.surviveTime; nextPing=RUN.pingInterval; pings=0; seenFlash=-9; spotCd=0;
   hunters.forEach(h=>{
     h.mode='drive'; h.x=h.spawn.x; h.z=h.spawn.z; h.axis=h.spawn.axis;
     h.fx=h.x; h.fz=h.z; h.carX=h.x; h.carZ=h.z;
@@ -852,10 +929,14 @@ function endGame(win){
   setState('over');
   $('endEyebrow').textContent = win? 'Uitzending afgelopen · jij wint':'Uitzending afgelopen';
   $('endTitle').innerHTML = win? 'Ont<span>snapt!</span> 🏆':'Ge<span>pakt!</span> 🚔';
-  const survived=CFG.surviveTime-timeLeft;
+  const survived = win? CFG.surviveTime : Math.min(CFG.surviveTime, CFG.surviveTime-timeLeft);
+  const prev = bestTime(RUN.level), record = survived > prev;
+  if(record) store.set('best.'+RUN.level, Math.round(survived));
   $('endStats').innerHTML =
-    `⏱ overleefd: <b>${fmt(win?CFG.surviveTime:survived)}</b> van ${fmt(CFG.surviveTime)}<br>`+
-    `📍 locatiedelingen: <b>${pings}</b> &nbsp;·&nbsp; 🕵️ jagers: ${hunters.length}`;
+    `⏱ overleefd: <b>${fmt(survived)}</b> van ${fmt(CFG.surviveTime)} · ${DIFF[RUN.level].naam}<br>`+
+    `📍 locatiedelingen: <b>${pings}</b> &nbsp;·&nbsp; 🕵️ jagers: ${hunters.length}<br>`+
+    (record? `🏅 <b>Nieuw record</b> op ${DIFF[RUN.level].naam}` : `🏅 record ${DIFF[RUN.level].naam}: ${fmt(prev)}`);
+  showLevelInfo();
   $('endScr').style.display='flex';
   win? sfxWin(): sfxLose();
 }
@@ -870,6 +951,7 @@ function retryGame(){
 function pauseGame(){
   if(state!=='play') return;
   setState('paused'); clearInput();
+  $('fps').textContent = `Beeld: ${Math.round(fpsNow())} fps`;
   $('pauseScr').style.display='flex';
   $('btnResume').focus({preventScroll:true});
 }
@@ -888,6 +970,42 @@ function toggleMute(){
   $('btnMute').textContent = muted? '🔇 Geluid: uit' : '🔊 Geluid: aan';
 }
 $('btnMute').textContent = muted? '🔇 Geluid: uit' : '🔊 Geluid: aan';
+
+/* ---------- moeilijkheid en record ---------- */
+const bestTime = level => Number(store.get('best.'+level, 0)) || 0;
+const WORDS = ['geen','één','twee','drie','vier','vijf'];
+function showLevelInfo(){
+  document.querySelectorAll('.lvl').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.level===RUN.level)));
+  $('ruleTime').textContent = fmt(CFG.surviveTime);
+  $('ruleHunters').textContent = WORDS[RUN.hunters] || String(RUN.hunters);
+  $('rulePing').textContent = Math.round(RUN.pingInterval);
+  const b = bestTime(RUN.level), naam = DIFF[RUN.level].naam;
+  $('best').textContent = b>=CFG.surviveTime ? `🏅 ${naam}: al eens ontsnapt`
+                        : b>0 ? `🏅 record ${naam}: ${fmt(b)} overleefd` : '';
+}
+function selectLevel(level){ applyDifficulty(level); store.set('level', RUN.level); showLevelInfo(); }
+document.querySelectorAll('.lvl').forEach(b=>b.addEventListener('click', ()=>selectLevel(b.dataset.level)));
+applyDifficulty(store.get('level', 'normaal'));
+showLevelInfo();
+
+/* ---------- beeldsnelheid (getoond in het pauzescherm) ---------- */
+const frameTimes = []; let frameSum = 0;
+function trackFrame(raw){
+  raw = Math.min(raw, 1); frameTimes.push(raw); frameSum += raw;
+  while(frameSum > 5 && frameTimes.length > 1) frameSum -= frameTimes.shift();
+}
+const fpsNow = () => frameSum>0 ? frameTimes.length/frameSum : 0;
+
+/* ---------- onverwachte fouten: spel loopt door, speler kan het melden ---------- */
+let errShown = false;
+function showErrBar(m){
+  if(errShown) return; errShown = true;
+  $('errBarLink').href = reportUrl(m); $('errBar').style.display = 'flex';
+}
+addEventListener('error', e=>showErrBar(e.message || 'onbekende fout'));
+addEventListener('unhandledrejection', e=>showErrBar(String(e.reason || 'onbekende fout')));
+$('errBarClose').addEventListener('click', ()=>{ $('errBar').style.display = 'none'; });
+
 $('btnStart').addEventListener('click', startGame);
 $('btnRetry').addEventListener('click', retryGame);
 $('btnResume').addEventListener('click', resumeGame);
@@ -963,7 +1081,7 @@ function stepGame(dt){
   if(timeLeft<=0){ endGame(true); return; }
   nextPing-=dt;
   if(nextPing<=0){
-    nextPing=CFG.pingInterval; pings++;
+    nextPing=RUN.pingInterval; pings++;
     intel.x=player.x; intel.z=player.z; intel.t=tNow;
     msg('📍 LOCATIE GEDEELD'); sfxPing();
   }
@@ -980,7 +1098,8 @@ function stepGame(dt){
 
 function animate(){
   requestAnimationFrame(animate);
-  const dt=Math.min(clock.getDelta(), .05);
+  const raw=clock.getDelta(); trackFrame(raw);
+  const dt=Math.min(raw, .05);
 
   if(state==='play'){
     stepGame(dt);

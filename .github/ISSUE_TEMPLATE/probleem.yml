@@ -1,0 +1,27 @@
+name: Probleem melden
+description: Iets werkt niet of ziet er vreemd uit in VOORTVLUCHTIG
+labels: [bug]
+body:
+  - type: textarea
+    id: wat
+    attributes:
+      label: Wat gebeurde er?
+      description: Wat deed je, wat zag je, en wat had je verwacht?
+    validations:
+      required: true
+  - type: input
+    id: toestel
+    attributes:
+      label: Toestel
+      placeholder: bijvoorbeeld iPhone 13, Samsung Galaxy A52, laptop met Windows 11
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Wordt automatisch ingevuld als je via de link in het spel komt.
+  - type: textarea
+    id: fout
+    attributes:
+      label: Foutmelding
+      description: Wordt automatisch ingevuld als je via de link in het spel komt.
+      render: text
