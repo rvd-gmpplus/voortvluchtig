@@ -33,7 +33,7 @@ Kies het niveau op het startscherm. Je keuze en je record per niveau worden in j
 
 | Niveau | Jagers | Snelheid jagers | Locatiedeling | Struiken |
 |---|---|---|---|---|
-| Makkelijk | één minder | x 0,9 | elke 56 s | dubbel zoveel |
+| Makkelijk | één minder (minimaal 1) | x 0,9 | elke 56 s | dubbel zoveel |
 | Normaal | 3 | x 1 | elke 45 s | 44 |
 | Moeilijk | 3 | x 1,1 | elke 36 s | 44 |
 

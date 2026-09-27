@@ -126,7 +126,7 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
 #best{font-size:12px;color:#9aa2ad;margin:-6px 0 14px;font-variant-numeric:tabular-nums}
 #fps{font-size:12px;color:#9aa2ad;margin:14px 0 0;font-variant-numeric:tabular-nums}
 .report{display:inline-block;margin-top:12px;font-size:13px;color:#ffb1b3}
-#errBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 60px);z-index:25;
+#errBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 8px);z-index:25;
   display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;background:rgba(120,20,26,.94);
   border:1px solid #ff8f92;font-size:12px;font-weight:700;max-width:92vw}
 #errBar a{color:#fff}
@@ -159,7 +159,7 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
     <h1>Voort<span>vluchtig</span></h1>
     <div class="sub">Eigen game geïnspireerd op het jachtconcept · niet gelieerd aan StukTV of Videoland</div>
     <ul class="rules">
-      <li><span class="ic">⏱</span><span><b>Blijf <span id="ruleTime">5:00</span> uit handen van <span id="ruleHunters">drie</span> jagers.</b> Word je aangetikt, dan is het klaar.</span></li>
+      <li><span class="ic">⏱</span><span><b>Blijf <span id="ruleTime">5:00</span> uit handen van <span id="ruleHunters">drie</span> <span id="ruleHuntersNoun">jagers</span>.</b> Word je aangetikt, dan is het klaar.</span></li>
       <li><span class="ic">📍</span><span>Elke <b><span id="rulePing">45</span> sec</b> wordt je locatie gedeeld. De jagers kennen ook je droppunt.</span></li>
       <li><span class="ic">🚗</span><span>Jagers rijden in zwarte auto's — <b>alleen over wegen</b>. Dichtbij stappen ze uit en jagen te voet.</span></li>
       <li><span class="ic">🌊</span><span><b>Sloten</b> oversteken is traag, maar auto's kunnen er niet langs. Gebruik ze.</span></li>
@@ -608,8 +608,10 @@ function msg(t, calm){
 const miniCtx = $('mini').getContext('2d');
 function sizeMini(){
   const r = Math.min(3, Math.max(1, window.devicePixelRatio||1));
-  $('mini').width = $('mini').height = Math.round(132*r);
-  miniCtx.setTransform(r,0,0,r,0,0);
+  const css = $('mini').clientWidth || 132;       // 132 px, of 104 px op smalle telefoons
+  const px = Math.round(css*r);
+  $('mini').width = $('mini').height = px;
+  miniCtx.setTransform(px/132,0,0,px/132,0,0);     // drawMini tekent in 132-eenheden
 }
 sizeMini();
 function drawMini(){
@@ -653,8 +655,10 @@ function clearInput(){
   joy.id=-1; joy.active=false; joy.x=0; joy.y=0; joyBase.style.display='none'; lookId=-1;
 }
 addEventListener('keydown', e=>{
-  if(!e.repeat && isKey(e,'KeyM','m')) toggleMute();
-  if(!e.repeat && (e.code==='Escape' || isKey(e,'KeyP','p'))){
+  // Actietoetsen op letter of positie, maar nooit via een looptoets (op Dvorak typt de D-plek een 'e').
+  const move = MOVE_KEYS[e.code];
+  if(!e.repeat && !move && isKey(e,'KeyM','m')) toggleMute();
+  if(!e.repeat && (e.code==='Escape' || (!move && isKey(e,'KeyP','p')))){
     if(state==='play'){ pauseGame(); e.preventDefault(); return; }
     if(state==='paused'){ resumeGame(); e.preventDefault(); return; }
   }
@@ -670,10 +674,9 @@ addEventListener('keydown', e=>{
     }
     return;
   }
-  const a = MOVE_KEYS[e.code];
-  if(a){ keys[a]=true; e.preventDefault(); }
+  if(move){ keys[move]=true; e.preventDefault(); }
   if(e.code==='Space') e.preventDefault();
-  if(e.repeat) return;
+  if(e.repeat || move) return;
   if(isKey(e,'KeyC','c')) toggleCrouch();
   if(isKey(e,'KeyE','e')) doAction();
 });
@@ -929,9 +932,10 @@ function endGame(win){
   setState('over');
   $('endEyebrow').textContent = win? 'Uitzending afgelopen · jij wint':'Uitzending afgelopen';
   $('endTitle').innerHTML = win? 'Ont<span>snapt!</span> 🏆':'Ge<span>pakt!</span> 🚔';
-  const survived = win? CFG.surviveTime : Math.min(CFG.surviveTime, CFG.surviveTime-timeLeft);
+  // hele seconden; een verlies telt nooit als ontsnapping (ook niet met een fractie over)
+  const survived = win? CFG.surviveTime : Math.min(CFG.surviveTime-1, Math.floor(CFG.surviveTime-timeLeft));
   const prev = bestTime(RUN.level), record = survived > prev;
-  if(record) store.set('best.'+RUN.level, Math.round(survived));
+  if(record) store.set('best.'+RUN.level, survived);
   $('endStats').innerHTML =
     `⏱ overleefd: <b>${fmt(survived)}</b> van ${fmt(CFG.surviveTime)} · ${DIFF[RUN.level].naam}<br>`+
     `📍 locatiedelingen: <b>${pings}</b> &nbsp;·&nbsp; 🕵️ jagers: ${hunters.length}<br>`+
@@ -978,6 +982,7 @@ function showLevelInfo(){
   document.querySelectorAll('.lvl').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.level===RUN.level)));
   $('ruleTime').textContent = fmt(CFG.surviveTime);
   $('ruleHunters').textContent = WORDS[RUN.hunters] || String(RUN.hunters);
+  $('ruleHuntersNoun').textContent = RUN.hunters===1? 'jager' : 'jagers';
   $('rulePing').textContent = Math.round(RUN.pingInterval);
   const b = bestTime(RUN.level), naam = DIFF[RUN.level].naam;
   $('best').textContent = b>=CFG.surviveTime ? `🏅 ${naam}: al eens ontsnapt`

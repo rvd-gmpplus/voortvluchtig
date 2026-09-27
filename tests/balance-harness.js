@@ -1,4 +1,4 @@
-// Balansmeting voor VOORTVLUCHTIG, gedeeld door tests/balance.spec.js en tools/balance-report.mjs.
+// Balansmeting voor VOORTVLUCHTIG, gebruikt door tests/balance.spec.js (en bruikbaar in eigen scripts).
 //
 // seedScript() komt via page.addInitScript in de pagina, vóór Three.js en het spel. Het maakt
 // Math.random voorspelbaar met twee aparte stromen: één voor Three.js (uuid's) en één voor het spel

@@ -166,7 +166,7 @@ test('overleven tot de tijd op is geeft winst en een record', async ({ page }) =
   await expect(page.locator('#endScr')).toBeVisible();
   await expect(page.locator('#endTitle')).toContainText('snapt');
   await expect(page.locator('#endStats')).toContainText('Nieuw record');
-  expect(await val(page, "store.get('best.normaal', 0)")).toBe(2);
+  expect(await val(page, "store.get('best.normaal', 0)")).toBe(1.5); // winnen = de volle surviveTime
 });
 
 test('een jager op je positie betekent gepakt', async ({ page }) => {
@@ -238,11 +238,16 @@ test('moeilijkheid: factoren op CFG, onthouden, Normaal gelijk aan CFG', async (
   await page.locator('.lvl[data-level="makkelijk"]').click();
   await expect(page.locator('.lvl[data-level="makkelijk"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#ruleHunters')).toHaveText('twee');
+  await expect(page.locator('#ruleHuntersNoun')).toHaveText('jagers');
   expect(await val(page, '({h: hunters.length, b: bushes.length, n: bushMesh.count})')).toEqual({ h: 2, b: 88, n: 88 });
   // een CFG-aanpassing werkt door op elk niveau
   const speeds = await val(page, `(() => { CFG.footSpeed = 10; const out = {};
     for (const l of Object.keys(DIFF)) { applyDifficulty(l); out[l] = RUN.footSpeed / CFG.footSpeed; } return out; })()`);
   expect(speeds).toEqual({ makkelijk: 0.9, normaal: 1, moeilijk: 1.1 });
+  // enkelvoud bij één jager
+  await page.evaluate(`CFG.hunters = 2; selectLevel('makkelijk')`);
+  await expect(page.locator('#ruleHunters')).toHaveText('één');
+  await expect(page.locator('#ruleHuntersNoun')).toHaveText('jager');
   await page.reload();
   await expect(page.locator('#btnStart')).toBeEnabled();
   expect(await val(page, 'RUN.level')).toBe('makkelijk');
@@ -282,14 +287,50 @@ test('onverwachte fout: spel loopt door en toont een meldlink', async ({ page })
   expect(await val(page, 'state')).toBe('play');
 });
 
-test('foutbalk ligt boven het start- en pauzescherm en is te sluiten', async ({ page }) => {
+test('foutbalk ligt boven start-, pauze- en eindscherm, dekt geen knoppen af en is te sluiten', async ({ page }) => {
   await openGame(page);
   await page.evaluate(`showErrBar('testfout')`);
-  const bovenop = await page.evaluate(`(() => { const b = $('errBarClose').getBoundingClientRect();
+  // start(page) klikt echt op de startknop: faalt als de balk die afdekt
+  const bovenop = () => page.evaluate(`(() => { const b = $('errBarClose').getBoundingClientRect();
     return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) === $('errBarClose'); })()`);
-  expect(bovenop).toBe(true);
+  expect(await bovenop()).toBe(true);                       // startscherm
+  await start(page);
+  await page.evaluate('pauseGame()');
+  expect(await bovenop()).toBe(true);                       // pauzescherm
+  await page.evaluate(`resumeGame(); endGame(false)`);
+  await expect(page.locator('#endScr')).toBeVisible();
+  expect(await bovenop()).toBe(true);                       // eindscherm
   await page.locator('#errBarClose').click();
   await expect(page.locator('#errBar')).toBeHidden();
+});
+
+test('record: verliezen vlak voor het einde telt niet als ontsnapt', async ({ page }) => {
+  await openGame(page);
+  await start(page);
+  await page.evaluate(`timeLeft = 0.3; hunters[0].mode = 'drive'; hunters[0].wps = []; hunters[0].x = player.x; hunters[0].z = player.z;
+    for (let i = 0; i < 3 && state === 'play'; i++) stepGame(0.01)`);
+  await expect(page.locator('#endTitle')).toContainText('pakt');
+  expect(await val(page, "store.get('best.normaal', 0)")).toBe(299);
+  await page.evaluate('quitGame(); showLevelInfo()');
+  await expect(page.locator('#best')).not.toContainText('ontsnapt');
+  await start(page);
+  await parkHunters(page);
+  await page.evaluate(`timeLeft = 0.05; for (let i = 0; i < 5 && state === 'play'; i++) stepGame(0.02)`);
+  await expect(page.locator('#endStats')).toContainText('Nieuw record');
+  expect(await val(page, "store.get('best.normaal', 0)")).toBe(300);
+});
+
+test('Dvorak: de D-plek typt "e" maar geeft geen fietsactie', async ({ page }, info) => {
+  test.skip(isMobile(info), 'toetsenbordtest');
+  await openGame(page);
+  await start(page);
+  await parkHunters(page);
+  // naast de fiets bij het droppunt, dan de fysieke D-toets die op Dvorak een 'e' typt
+  await page.evaluate(`player.x = bikes[0].x - 1; player.z = bikes[0].z; stepGame(0.016);
+    dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyD', key: 'e'}))`);
+  await advance(page, 0.2);
+  await page.evaluate(`dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyD', key: 'e'}))`);
+  expect(await val(page, 'player.bike')).toBe(null);
 });
 
 test('foutscherm met meldlink als Three.js niet laadt @kern', async ({ page }) => {
@@ -357,6 +398,9 @@ test('smalle telefoon: melding overlapt timer, minikaart en pauzeknop niet', asy
   expect(overlap(rects.msg, rects.top)).toBe(false);
   expect(overlap(rects.msg, rects.mini)).toBe(false);
   expect(overlap(rects.msg, rects.pause)).toBe(false);
+  // minikaart scherp op de kleinere maat: backing store = CSS-maat x pixeldichtheid
+  const mini = await val(page, `({css: $('mini').clientWidth, w: $('mini').width, r: Math.min(3, Math.max(1, devicePixelRatio))})`);
+  expect(mini.w).toBe(Math.round(mini.css * mini.r));
 });
 
 test('gepubliceerde map is compleet: elke lokale verwijzing bestaat', async ({ page, request }) => {
