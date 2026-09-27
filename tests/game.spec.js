@@ -137,7 +137,8 @@ test('overleven tot de tijd op is geeft winst', async ({ page }) => {
   await openGame(page);
   await page.evaluate('CFG.surviveTime = 1.5');
   await start(page);
-  await expect(page.locator('#endScr')).toBeVisible({ timeout: 10_000 });
+  // speltijd loopt alleen door zolang er frames zijn; ruime wandkloktijd voor trage software-WebGL
+  await expect(page.locator('#endScr')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#endTitle')).toContainText('snapt');
 });
 

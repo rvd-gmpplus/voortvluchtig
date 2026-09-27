@@ -956,30 +956,34 @@ function playerStep(dt){
 let hudT=0;
 if(!('ontouchstart' in window)) document.body.classList.add('deskOnly');
 
+// Eén simulatiestap van het spel, los van het tekenen. De balanstest speelt hiermee hele
+// potjes versneld na (tests/balance.spec.js).
+function stepGame(dt){
+  tNow+=dt; timeLeft-=dt;
+  if(timeLeft<=0){ endGame(true); return; }
+  nextPing-=dt;
+  if(nextPing<=0){
+    nextPing=CFG.pingInterval; pings++;
+    intel.x=player.x; intel.z=player.z; intel.t=tNow;
+    msg('📍 LOCATIE GEDEELD'); sfxPing();
+  }
+  playerStep(dt);
+  for(const h of hunters){
+    senseStep(h);
+    if(state!=='play') break;
+    if(h.mode==='drive') driveStep(h,dt);
+    else if(h.mode==='foot') footStep(h,dt);
+    else returnStep(h,dt);
+    if(state!=='play') break;
+  }
+}
+
 function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(), .05);
 
   if(state==='play'){
-    tNow+=dt; timeLeft-=dt;
-    if(timeLeft<=0){endGame(true);}
-    else {
-      nextPing-=dt;
-      if(nextPing<=0){
-        nextPing=CFG.pingInterval; pings++;
-        intel.x=player.x; intel.z=player.z; intel.t=tNow;
-        msg('📍 LOCATIE GEDEELD'); sfxPing();
-      }
-      playerStep(dt);
-      for(const h of hunters){
-        senseStep(h);
-        if(state!=='play') break;
-        if(h.mode==='drive') driveStep(h,dt);
-        else if(h.mode==='foot') footStep(h,dt);
-        else returnStep(h,dt);
-        if(state!=='play') break;
-      }
-    }
+    stepGame(dt);
     windmillHub.rotation.z += dt*.7;
     for(let i=0;i<drinks.length;i++){
       const d=drinks[i]; if(d.done) continue;
