@@ -23,7 +23,7 @@ jobs:
       contents: read
       pages: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -45,7 +45,7 @@ jobs:
           t=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null) || t="uit"
           echo "Pages-status: \`$t\` (nodig: \`workflow\`)" >> "$GITHUB_STEP_SUMMARY"
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -77,10 +77,10 @@ jobs:
             echo "::error::GitHub Pages publiceert vanuit een branch ($t); daarmee valt de testpoort weg. Zet Settings > Pages > Source op 'GitHub Actions'."
             exit 1
           fi
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - name: Publiceer
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       - name: Livecheck (serveert de site deze commit?)
         run: |
           url="${{ steps.deployment.outputs.page_url }}versie.txt"
