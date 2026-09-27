@@ -16,7 +16,17 @@ async function openGame(page) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('request', (r) => requests.push(r.url()));
   await page.goto('/');
-  await expect(page.locator('#btnStart')).toBeEnabled();
+  // De eerste frame compileert alle shaders; met software-WebGL kan dat even duren.
+  try {
+    await expect(page.locator('#btnStart')).toBeEnabled({ timeout: 20_000 });
+  } catch (e) {
+    const diag = await page.evaluate(() => ({
+      foutscherm: getComputedStyle(document.getElementById('errScr')).display,
+      titel: document.getElementById('errTitle').textContent,
+      renderer: typeof window.THREE === 'object' ? 'THREE geladen' : 'THREE ontbreekt',
+    }));
+    throw new Error(`Startknop bleef uit. ${JSON.stringify(diag)} fouten=${JSON.stringify(errors)}`);
+  }
   return { errors, requests };
 }
 
