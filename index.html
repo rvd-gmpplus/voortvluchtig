@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>VOORTVLUCHTIG — ontsnap aan de jagers</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;position:fixed;inset:0;background:#0b0d10;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  touch-action:none;user-select:none;-webkit-user-select:none;color:#fff}
+canvas{display:block}
+#game{position:fixed;inset:0}
+
+/* ---------- HUD ---------- */
+#vig{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity .3s;
+  box-shadow:inset 0 0 110px 34px rgba(229,72,77,.55)}
+.panel{background:rgba(10,12,16,.74);border:1px solid rgba(255,255,255,.14);border-radius:12px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#topLeft{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:12px;z-index:6;
+  pointer-events:none;padding:8px 14px 9px}
+#timer{font-size:27px;font-weight:900;letter-spacing:1.5px;font-variant-numeric:tabular-nums;line-height:1}
+#timer.low{color:#ff5252;animation:pulse 1s infinite}
+#pingT{margin-top:4px;font-size:12px;font-weight:800;letter-spacing:.8px;color:#ffb1b3;
+  font-variant-numeric:tabular-nums}
+#mini{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:12px;z-index:6;
+  width:132px;height:132px;border-radius:12px;border:1px solid rgba(255,255,255,.16);
+  pointer-events:none;background:#0e1f16}
+#msgs{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);
+  z-index:7;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;max-width:82vw}
+.msg{padding:7px 16px;border-radius:999px;background:rgba(190,26,36,.92);color:#fff;font-weight:900;
+  font-size:13px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;
+  box-shadow:0 4px 18px rgba(0,0,0,.45);animation:msgIn .22s ease-out;transition:opacity .4s,transform .4s}
+.msg.calm{background:rgba(18,22,28,.9);border:1px solid rgba(255,255,255,.2)}
+.msg.out{opacity:0;transform:translateY(-8px)}
+@keyframes msgIn{from{opacity:0;transform:translateY(-10px) scale(.95)}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+#stamWrap{position:fixed;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 16px);width:min(44vw,260px);height:10px;
+  border-radius:999px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.22);overflow:hidden}
+#stamFill{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,#ffd23f,#ff9f1a);
+  transition:width .1s linear}
+#stamFill.boost{background:linear-gradient(90deg,#5df2a0,#19c37d)}
+#hideChip{position:fixed;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 34px);padding:5px 14px;border-radius:999px;
+  background:rgba(24,66,36,.92);border:1px solid #3fae63;font-weight:900;font-size:12px;
+  letter-spacing:1.2px;display:none}
+
+/* ---------- Touch controls ---------- */
+#joyBase{position:fixed;z-index:6;width:118px;height:118px;border-radius:50%;pointer-events:none;
+  border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.07);display:none;
+  transform:translate(-50%,-50%)}
+#joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;border-radius:50%;
+  background:rgba(255,255,255,.85);transform:translate(-50%,-50%);box-shadow:0 3px 12px rgba(0,0,0,.4)}
+#btnCol{position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:8;
+  display:flex;flex-direction:column;gap:12px}
+.btn{pointer-events:auto;width:64px;height:64px;border-radius:50%;background:rgba(18,22,28,.78);
+  border:2px solid rgba(255,255,255,.28);color:#fff;font-size:26px;display:flex;align-items:center;
+  justify-content:center;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.4);touch-action:none}
+.btn:active{transform:scale(.94)}
+.btn.on{background:#c8232c;border-color:#ff8f92}
+.btn.hiddenB{display:none}
+.deskOnly #btnCol{display:none}
+
+/* ---------- Screens ---------- */
+.scr{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 120% at 50% 0%,rgba(30,8,10,.94),rgba(7,9,12,.97));padding:16px}
+.card{max-width:560px;width:100%;max-height:92dvh;overflow:auto;padding:26px 26px 22px;
+  background:rgba(13,15,20,.92);border:1px solid rgba(255,255,255,.14);border-radius:18px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.eyebrow{font-size:11px;font-weight:900;letter-spacing:3px;color:#ff6b70;text-transform:uppercase}
+h1{font-size:clamp(34px,9vw,52px);font-weight:900;font-style:italic;letter-spacing:-1px;line-height:.98;
+  margin:6px 0 4px;text-transform:uppercase}
+h1 span{color:#e5484d}
+.sub{font-size:12px;color:#9aa2ad;margin-bottom:16px}
+.rules{list-style:none;display:flex;flex-direction:column;gap:9px;margin:0 0 16px}
+.rules li{font-size:14px;line-height:1.45;color:#dde2e8;display:flex;gap:10px}
+.rules li b{color:#fff}
+.rules .ic{flex:0 0 22px;text-align:center}
+.ctrl{font-size:12px;color:#9aa2ad;border-top:1px solid rgba(255,255,255,.1);padding-top:12px;
+  margin-bottom:18px;line-height:1.7}
+.big{width:100%;padding:16px;border:0;border-radius:12px;background:#e5484d;color:#fff;font-size:17px;
+  font-weight:900;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  box-shadow:0 8px 26px rgba(229,72,77,.4)}
+.big:active{transform:scale(.98)}
+#endScr{display:none}
+#endTitle{margin-bottom:2px}
+#endStats{font-size:14px;color:#c8ced6;margin:10px 0 18px;line-height:1.7;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="vig"></div>
+<div id="topLeft" class="panel"><div id="timer">5:00</div><div id="pingT">📍 volgende deling: 45s</div></div>
+<canvas id="mini" width="264" height="264"></canvas>
+<div id="msgs"></div>
+<div id="stamWrap"><div id="stamFill"></div></div>
+<div id="hideChip">🌿 VERSTOPT</div>
+
+<div id="joyBase"><div id="joyKnob"></div></div>
+<div id="btnCol">
+  <button id="btnAct" class="btn hiddenB">🚲</button>
+  <button id="btnHide" class="btn">🌿</button>
+  <button id="btnSprint" class="btn">🏃</button>
+</div>
+
+<div id="startScr" class="scr">
+  <div class="card">
+    <div class="eyebrow">Live klopjacht · aflevering 1</div>
+    <h1>Voort<span>vluchtig</span></h1>
+    <div class="sub">Eigen game geïnspireerd op het jachtconcept · niet gelieerd aan StukTV of Videoland</div>
+    <ul class="rules">
+      <li><span class="ic">⏱</span><span><b>Blijf 5:00 uit handen van de jagers.</b> Word je aangetikt, dan is het klaar.</span></li>
+      <li><span class="ic">📍</span><span>Elke <b>45 sec</b> wordt je locatie gedeeld. De jagers kennen ook je droppunt.</span></li>
+      <li><span class="ic">🚗</span><span>Jagers rijden in zwarte auto's — <b>alleen over wegen</b>. Dichtbij stappen ze uit en jagen te voet.</span></li>
+      <li><span class="ic">🌊</span><span><b>Sloten</b> oversteken is traag, maar auto's kunnen er niet langs. Gebruik ze.</span></li>
+      <li><span class="ic">🌿</span><span>Buk bij <b>struiken</b> om vrijwel onzichtbaar te worden.</span></li>
+      <li><span class="ic">🚲</span><span>Pak een <b>fiets</b>: sneller, geen conditieverlies, wel opvallender.</span></li>
+      <li><span class="ic">⚡</span><span>Energiedrank = volle conditie + korte snelheidsboost.</span></li>
+    </ul>
+    <div class="ctrl">📱 <b>Mobiel:</b> linkerhelft = joystick · rechterhelft vegen = camera · knoppen rechtsonder<br>
+      ⌨️ <b>Desktop:</b> WASD/pijltjes · Shift = sprint · C = bukken · E = fiets · muis slepen = camera · scroll = zoom</div>
+    <button id="btnStart" class="big">▶ Start de ontsnapping</button>
+  </div>
+</div>
+
+<div id="endScr" class="scr">
+  <div class="card">
+    <div class="eyebrow" id="endEyebrow">Uitzending afgelopen</div>
+    <h1 id="endTitle">Gepakt!</h1>
+    <div id="endStats"></div>
+    <button id="btnRetry" class="big">↻ Opnieuw proberen</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =====================================================================
+   VOORTVLUCHTIG — 3D klopjacht in de browser (mobiel + desktop)
+   Eén bestand, Three.js r128, geen build stap.
+   Alle balans-knoppen staan hieronder in CFG.
+   ===================================================================== */
+const CFG = {
+  surviveTime: 300,          // seconden overleven om te winnen
+  pingInterval: 45,          // locatiedeling-interval
+  mapHalf: 480,              // wereld loopt van -480..480
+  roads:  [-360, -120, 120, 360],   // wegen (beide assen)
+  canals: [-240, 0, 240],           // sloten (beide assen)
+  walk: 6, sprint: 10, crouch: 2.6, bike: 13.2, waterMul: 0.35,
+  carSpeed: 16, footSpeed: 8.6,
+  seeCar: 75, seeFoot: 55, seeHidden: 13, bikePenalty: 12,
+  catchR: 2.1, exitDist: 34, intelFreshDrive: 26, intelLive: 4,
+  stamMax: 100, stamDrain: 17, stamRegen: 11,
+};
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const rand  = (a,b)=>a+Math.random()*(b-a);
+const dist  = (x1,z1,x2,z2)=>Math.hypot(x1-x2,z1-z2);
+const nearLine = (arr,v,m)=>arr.some(a=>Math.abs(v-a)<m);
+const nearestRoad = v=>{let b=CFG.roads[0],d=1e9;for(const r of CFG.roads){const dd=Math.abs(r-v);if(dd<d){d=dd;b=r}}return b};
+function inWater(x,z){
+  for(const c of CFG.canals){
+    if(Math.abs(z-c)<3.5 && !nearLine(CFG.roads,x,8)) return true; // horizontale sloot
+    if(Math.abs(x-c)<3.5 && !nearLine(CFG.roads,z,8)) return true; // verticale sloot (brug bij weg)
+  }
+  return false;
+}
+
+/* ---------- three.js basis ---------- */
+let scene, camera, renderer, clock;
+const V1=null, RAY=null; // placeholders vervangen na THREE load
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+const ray = new THREE.Raycaster();
+
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfd9ea);
+scene.fog = new THREE.Fog(0xbfd9ea, 130, 430);
+camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.1, 900);
+renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.8));
+renderer.setSize(innerWidth, innerHeight);
+$('game').appendChild(renderer.domElement);
+clock = new THREE.Clock();
+
+scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x5f7346, 0.95));
+const sun = new THREE.DirectionalLight(0xfff1d6, 0.85);
+sun.position.set(140, 190, 90);
+scene.add(sun);
+
+const lam = c => new THREE.MeshLambertMaterial({color:c});
+function blob(r){
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r,14),
+    new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.24, depthWrite:false}));
+  m.rotation.x = -Math.PI/2; m.position.y = .045; return m;
+}
+
+/* ---------- wereld ---------- */
+const boxColliders=[], circleColliders=[], losBlockers=[], bushes=[], bikes=[], drinks=[];
+
+(function buildGround(){
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(1120,1120), lam(0x79a35c));
+  g.rotation.x = -Math.PI/2; scene.add(g);
+  const patchCols = [0x8fb968, 0xc7b45a, 0x6f9c53, 0x9db06a];
+  for(let i=0;i<14;i++){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(rand(55,105), rand(55,105)),
+      lam(patchCols[i%patchCols.length]));
+    p.rotation.x=-Math.PI/2; p.position.set(rand(-440,440), .012, rand(-440,440));
+    scene.add(p);
+  }
+  for(const r of CFG.roads){
+    const h = new THREE.Mesh(new THREE.PlaneGeometry(1120,10), lam(0x54585d));
+    h.rotation.x=-Math.PI/2; h.position.set(0,.02,r); scene.add(h);
+    const hl = new THREE.Mesh(new THREE.PlaneGeometry(1120,.5), lam(0xcfd3d8));
+    hl.rotation.x=-Math.PI/2; hl.position.set(0,.03,r); scene.add(hl);
+    const v = new THREE.Mesh(new THREE.PlaneGeometry(10,1120), lam(0x54585d));
+    v.rotation.x=-Math.PI/2; v.position.set(r,.021,0); scene.add(v);
+    const vl = new THREE.Mesh(new THREE.PlaneGeometry(.5,1120), lam(0xcfd3d8));
+    vl.rotation.x=-Math.PI/2; vl.position.set(r,.031,0); scene.add(vl);
+  }
+  for(const c of CFG.canals){
+    const wm = new THREE.MeshLambertMaterial({color:0x4a8fc7});
+    const h = new THREE.Mesh(new THREE.PlaneGeometry(1120,7), wm);
+    h.rotation.x=-Math.PI/2; h.position.set(0,.015,c); scene.add(h);
+    const v = new THREE.Mesh(new THREE.PlaneGeometry(7,1120), wm);
+    v.rotation.x=-Math.PI/2; v.position.set(c,.016,0); scene.add(v);
+  }
+})();
+
+function addHouse(x,z,w=8,d=7,h=5,wall=0xa5623b,roof=0x7a3b2e){
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), lam(wall));
+  walls.position.set(x,h/2,z); scene.add(walls);
+  const rf = new THREE.Mesh(new THREE.ConeGeometry(Math.hypot(w,d)/2*1.03, h*.62, 4), lam(roof));
+  rf.rotation.y = Math.PI/4; rf.position.set(x, h + h*.31, z); scene.add(rf);
+  boxColliders.push({x, z, hw:w/2+.15, hd:d/2+.15});
+  losBlockers.push(walls);
+}
+addHouse(-300,-180);            addHouse(-300,-156,12,8,6,0x3c6e47,0x2f3338); // boerderij + schuur
+addHouse(60,-300,9,7,5);        addHouse(300,60,8,7,5,0xc9c1b4,0x5a5f66);
+addHouse(300,86,12,8,6,0x8a3d33,0x33373d);
+addHouse(-60,300,8,6,5);        addHouse(-180,-60,9,7,5,0xb9754a,0x6e3a2c);
+addHouse(180,-60,8,7,5);        addHouse(-300,300,12,8,6,0x3c6e47,0x2f3338);
+addHouse(60,186,8,6,5,0xc9c1b4,0x7a3b2e);
+
+// molen — landmark
+const windmillHub = (function(){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6,3.7,11,10), lam(0x8a7258));
+  base.position.y = 5.5; g.add(base);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(3.1,2.8,8), lam(0x54402f));
+  cap.position.y = 12.3; g.add(cap);
+  const hub = new THREE.Group(); hub.position.set(0,10.6,3.2);
+  for(let i=0;i<4;i++){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(.8,8.6,.14), lam(0xe8e2d4));
+    b.position.y = 4.3;
+    const arm = new THREE.Group(); arm.rotation.z = i*Math.PI/2; arm.add(b); hub.add(arm);
+  }
+  g.add(hub);
+  g.position.set(180,0,180); scene.add(g);
+  circleColliders.push({x:180,z:180,r:3.4}); losBlockers.push(base);
+  return hub;
+})();
+
+function randField(margin=9, tries=200){
+  for(let i=0;i<tries;i++){
+    const x=rand(-462,462), z=rand(-462,462);
+    if(nearLine(CFG.roads,x,margin)||nearLine(CFG.roads,z,margin)) continue;
+    if(nearLine(CFG.canals,x,6)||nearLine(CFG.canals,z,6)) continue;
+    let bad=false;
+    for(const b of boxColliders) if(Math.abs(x-b.x)<b.hw+4 && Math.abs(z-b.z)<b.hd+4){bad=true;break}
+    if(!bad) for(const c of circleColliders) if(dist(x,z,c.x,c.z)<c.r+4){bad=true;break}
+    if(!bad) return {x,z};
+  }
+  return {x:rand(-400,400), z:rand(-400,400)};
+}
+
+for(let i=0;i<58;i++){ // bomen
+  const p = randField();
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.28,.44,2.7,8), lam(0x7a5230));
+  trunk.position.y = 1.35; g.add(trunk);
+  const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.9,10,8), lam(0x3e7d3a));
+  c1.position.y = 3.7; g.add(c1);
+  const c2 = new THREE.Mesh(new THREE.SphereGeometry(1.25,9,7), lam(0x468a41));
+  c2.position.y = 5.0; g.add(c2);
+  g.position.set(p.x,0,p.z); scene.add(g);
+  losBlockers.push(c1);
+  circleColliders.push({x:p.x, z:p.z, r:.75});
+}
+for(let i=0;i<44;i++){ // struiken (verstopplekken)
+  const p = randField(8);
+  const b = new THREE.Mesh(new THREE.SphereGeometry(1.55,9,7), lam(0x2f5d33));
+  b.scale.y=.55; b.position.set(p.x,.8,p.z); scene.add(b);
+  bushes.push(p);
+}
+for(let i=0;i<5;i++){ // energiedrank
+  const p = randField();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(.55,.95,.55),
+    new THREE.MeshLambertMaterial({color:0xffd23f, emissive:0x6b4e00}));
+  m.position.set(p.x,1,p.z); scene.add(m);
+  drinks.push({x:p.x, z:p.z, m, done:false});
+}
+
+// busje op het droppunt
+(function(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.5,2.3,6), lam(0xd8d8de));
+  body.position.y=1.55; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.5,1.4,1.6), lam(0x2c3138));
+  cab.position.set(0,1.5,3.2); g.add(cab);
+  for(const [wx,wz] of [[-1.25,2.1],[1.25,2.1],[-1.25,-2.1],[1.25,-2.1]]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.35,10), lam(0x111));
+    w.rotation.z=Math.PI/2; w.position.set(wx,.5,wz); g.add(w);
+  }
+  g.add(blob(2.4));
+  g.position.set(-120,0,-312); scene.add(g);
+  boxColliders.push({x:-120,z:-312,hw:1.5,hd:3.2});
+  losBlockers.push(body);
+})();
+
+function makeBikeMesh(){
+  const g = new THREE.Group();
+  const wg = new THREE.TorusGeometry(.62,.09,8,16), wmat=lam(0x1a1a1a);
+  const w1 = new THREE.Mesh(wg,wmat); w1.rotation.y=Math.PI/2; w1.position.set(0,.62,1.02); g.add(w1);
+  const w2 = new THREE.Mesh(wg,wmat); w2.rotation.y=Math.PI/2; w2.position.set(0,.62,-1.02); g.add(w2);
+  const fr = new THREE.Mesh(new THREE.BoxGeometry(.12,.12,2.1), lam(0xff7a1a));
+  fr.position.y=1.02; g.add(fr);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(.34,.1,.5), lam(0x222));
+  seat.position.set(0,1.22,-.55); g.add(seat);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.8,6), lam(0x222));
+  bar.rotation.z=Math.PI/2; bar.position.set(0,1.3,.85); g.add(bar);
+  g.add(blob(.9));
+  return g;
+}
+for(const [x,z] of [[-107,-306],[133,36],[-347,196]]){
+  const g = makeBikeMesh(); g.position.set(x,0,z); g.rotation.y=rand(0,6.28); scene.add(g);
+  bikes.push({x,z,hx:x,hz:z,g,taken:false});
+}
+
+function makeFigure(cloth, skin, hat){
+  const g = new THREE.Group();
+  const legs = new THREE.Mesh(new THREE.CylinderGeometry(.42,.48,1.05,10), lam(cloth));
+  legs.position.y=.55; g.add(legs);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.5,.44,.95,10), lam(cloth));
+  body.position.y=1.5; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.36,12,10), lam(skin));
+  head.position.y=2.25; g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(.375,12,8,0,Math.PI*2,0,Math.PI/2), lam(hat));
+  cap.position.y=2.3; g.add(cap);
+  g.add(blob(1.0));
+  return g;
+}
+function makeCar(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.3,1.05,4.8), lam(0x0d0f13));
+  body.position.y=1.0; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.12,.8,2.6), lam(0x11161d));
+  cab.position.set(0,1.85,-.15); g.add(cab);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(2.16,.42,2.64), lam(0x2b3f52));
+  win.position.set(0,1.92,-.15); g.add(win);
+  for(const [wx,wz] of [[-1.08,1.6],[1.08,1.6],[-1.08,-1.6],[1.08,-1.6]]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.36,10), lam(0x0a0a0a));
+    w.rotation.z=Math.PI/2; w.position.set(wx,.5,wz); g.add(w);
+  }
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.8,.16,.1),
+    new THREE.MeshLambertMaterial({color:0xfff2b0, emissive:0x8a7a2a}));
+  lamp.position.set(0,.95,2.42); g.add(lamp);
+  g.add(blob(2.3));
+  return g;
+}
+
+// locatie-ping ring (signatuur-element)
+const pingRing = new THREE.Mesh(new THREE.RingGeometry(2.2,3.2,36),
+  new THREE.MeshBasicMaterial({color:0xff3b3b, transparent:true, opacity:.9, side:THREE.DoubleSide}));
+pingRing.rotation.x = -Math.PI/2; pingRing.position.y=.06; scene.add(pingRing);
+
+scene.updateMatrixWorld(true);
+
+/* ---------- speler & jagers ---------- */
+const SPAWN = {x:-112, z:-303};
+const player = {x:SPAWN.x, z:SPAWN.z, rot:0, stam:CFG.stamMax, crouch:false, bike:null, boostT:-9};
+const pMesh = makeFigure(0xff7a1a, 0xe8b98f, 0xff7a1a); // oranje overall — de voortvluchtige
+scene.add(pMesh);
+
+const intel = {x:SPAWN.x, z:SPAWN.z, t:0}; // wat de jagers weten
+let hunters = [];
+function makeHunter(x,z,axis){
+  const car = makeCar(); car.position.set(x,0,z); scene.add(car);
+  const fig = makeFigure(0x15181d, 0xdfb28c, 0x0c0e11); fig.visible=false; scene.add(fig);
+  return {car, fig, mode:'drive', axis, x, z, fx:x, fz:z, carX:x, carZ:z,
+          wps:[], routeT:-1, nextRoute:0, parkTgt:false,
+          sees:false, losT:0, searchUntil:0, searchX:0, searchZ:0, spawn:{x,z,axis}};
+}
+const HUNTER_SPAWNS = [[360,360,'v'],[-360,360,'h'],[360,-360,'h']];
+for(const s of HUNTER_SPAWNS) hunters.push(makeHunter(s[0],s[1],s[2]));
+
+/* ---------- botsingen ---------- */
+function collideEntity(p, r){
+  p.x = clamp(p.x, -470, 470); p.z = clamp(p.z, -470, 470);
+  for(const b of boxColliders){
+    const dx=p.x-b.x, dz=p.z-b.z;
+    if(Math.abs(dx)<b.hw+r && Math.abs(dz)<b.hd+r){
+      const ox=b.hw+r-Math.abs(dx), oz=b.hd+r-Math.abs(dz);
+      if(ox<oz) p.x += dx>0?ox:-ox; else p.z += dz>0?oz:-oz;
+    }
+  }
+  for(const c of circleColliders){
+    const dx=p.x-c.x, dz=p.z-c.z, rr=c.r+r, d2=dx*dx+dz*dz;
+    if(d2<rr*rr && d2>1e-6){const d=Math.sqrt(d2); p.x=c.x+dx/d*rr; p.z=c.z+dz/d*rr;}
+  }
+}
+
+/* ---------- audio ---------- */
+let AC=null, spotCd=0;
+function initAudio(){
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+  if(AC && AC.state==='suspended') AC.resume();
+}
+function sfx(f, dur=.12, type='square', g=.15, slide){
+  if(!AC) return;
+  const t=AC.currentTime, o=AC.createOscillator(), ga=AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide, t+dur);
+  ga.gain.setValueAtTime(g,t); ga.gain.exponentialRampToValueAtTime(.001, t+dur);
+  o.connect(ga); ga.connect(AC.destination); o.start(t); o.stop(t+dur+.03);
+}
+const sfxPing = ()=>{sfx(660,.12,'sine',.22); setTimeout(()=>sfx(990,.16,'sine',.22),130)};
+const sfxSpot = ()=>{sfx(170,.26,'sawtooth',.16,120); setTimeout(()=>sfx(170,.26,'sawtooth',.16,120),280)};
+const sfxWin  = ()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>sfx(f,.18,'triangle',.2), i*140))};
+const sfxLose = ()=>sfx(320,.6,'sawtooth',.2,70);
+
+/* ---------- HUD ---------- */
+const msgBox=$('msgs');
+function msg(t, calm){
+  const d=document.createElement('div');
+  d.className='msg'+(calm?' calm':''); d.textContent=t;
+  msgBox.appendChild(d);
+  while(msgBox.children.length>3) msgBox.firstChild.remove();
+  setTimeout(()=>d.classList.add('out'), 2100);
+  setTimeout(()=>d.remove(), 2600);
+}
+const miniCtx = $('mini').getContext('2d'); miniCtx.scale(2,2);
+function drawMini(){
+  const c=miniCtx, S=132, M=v=>(v+CFG.mapHalf)*(S/(CFG.mapHalf*2));
+  c.fillStyle='#12271b'; c.fillRect(0,0,S,S);
+  c.strokeStyle='#4a8fc7'; c.lineWidth=1.6;
+  for(const k of CFG.canals){
+    c.beginPath(); c.moveTo(0,M(k)); c.lineTo(S,M(k)); c.stroke();
+    c.beginPath(); c.moveTo(M(k),0); c.lineTo(M(k),S); c.stroke();
+  }
+  c.strokeStyle='#a7adb4'; c.lineWidth=2.2;
+  for(const r of CFG.roads){
+    c.beginPath(); c.moveTo(0,M(r)); c.lineTo(S,M(r)); c.stroke();
+    c.beginPath(); c.moveTo(M(r),0); c.lineTo(M(r),S); c.stroke();
+  }
+  if(tNow-intel.t < 15){
+    c.strokeStyle='#ff4646'; c.lineWidth=2;
+    c.beginPath(); c.arc(M(intel.x), M(intel.z), 5+2*Math.sin(tNow*6), 0, 7); c.stroke();
+  }
+  for(const h of hunters){ // alleen zichtbaar als je ze kunt "horen"
+    const hx = h.mode==='drive'? h.x : h.fx, hz = h.mode==='drive'? h.z : h.fz;
+    if(dist(hx,hz,player.x,player.z) < 85){
+      c.fillStyle='#ff3b3b'; c.beginPath(); c.arc(M(hx),M(hz),3,0,7); c.fill();
+    }
+  }
+  c.save(); c.translate(M(player.x), M(player.z)); c.rotate(Math.PI - player.rot);
+  c.fillStyle='#fff'; c.beginPath(); c.moveTo(0,-6); c.lineTo(4.4,4.5); c.lineTo(-4.4,4.5);
+  c.closePath(); c.fill(); c.restore();
+}
+
+/* ---------- input ---------- */
+const keys = {};
+addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase(); keys[k]=true;
+  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  if(!e.repeat && k==='c') toggleCrouch();
+  if(!e.repeat && k==='e') doAction();
+});
+addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+addEventListener('contextmenu', e=>e.preventDefault());
+addEventListener('gesturestart', e=>e.preventDefault());
+
+let camYaw=Math.PI*.15, camPitch=.42, camDist=9.5;
+const joy={id:-1, active:false, bx:0, by:0, x:0, y:0};
+let lookId=-1, lX=0, lY=0, sprintHold=false, nearBike=null;
+const joyBase=$('joyBase'), joyKnob=$('joyKnob');
+
+addEventListener('touchstart', e=>{
+  for(const t of e.changedTouches){
+    if(t.target.closest('.btn') || t.target.closest('.scr')) continue;
+    if(t.clientX < innerWidth*.45 && joy.id<0){
+      joy.id=t.identifier; joy.active=true; joy.bx=t.clientX; joy.by=t.clientY; joy.x=0; joy.y=0;
+      joyBase.style.display='block';
+      joyBase.style.left=t.clientX+'px'; joyBase.style.top=t.clientY+'px';
+      joyKnob.style.transform='translate(-50%,-50%)';
+    } else if(lookId<0){ lookId=t.identifier; lX=t.clientX; lY=t.clientY; }
+  }
+  if(!e.target.closest('.scr')) e.preventDefault();
+}, {passive:false});
+addEventListener('touchmove', e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===joy.id){
+      const R=46; let dx=t.clientX-joy.bx, dy=t.clientY-joy.by;
+      const d=Math.hypot(dx,dy); if(d>R){dx*=R/d; dy*=R/d;}
+      joy.x=dx/R; joy.y=-dy/R;
+      joyKnob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    } else if(t.identifier===lookId){
+      camYaw   -= (t.clientX-lX)*.006;
+      camPitch  = clamp(camPitch+(t.clientY-lY)*.004, .15, 1.05);
+      lX=t.clientX; lY=t.clientY;
+    }
+  }
+  if(!e.target.closest('.scr')) e.preventDefault();
+}, {passive:false});
+function touchEnd(e){
+  for(const t of e.changedTouches){
+    if(t.identifier===joy.id){joy.id=-1; joy.active=false; joy.x=0; joy.y=0; joyBase.style.display='none';}
+    if(t.identifier===lookId) lookId=-1;
+  }
+}
+addEventListener('touchend', touchEnd); addEventListener('touchcancel', touchEnd);
+
+let mDown=false;
+renderer.domElement.addEventListener('mousedown', e=>{mDown=true; lX=e.clientX; lY=e.clientY;});
+addEventListener('mousemove', e=>{
+  if(!mDown) return;
+  camYaw   -= (e.clientX-lX)*.005;
+  camPitch  = clamp(camPitch+(e.clientY-lY)*.0035, .15, 1.05);
+  lX=e.clientX; lY=e.clientY;
+});
+addEventListener('mouseup', ()=>mDown=false);
+addEventListener('wheel', e=>{camDist=clamp(camDist+e.deltaY*.01, 6, 15);}, {passive:true});
+
+const btnSprint=$('btnSprint'), btnHide=$('btnHide'), btnAct=$('btnAct');
+function press(el, on, off){
+  el.addEventListener('pointerdown', e=>{e.preventDefault(); on();});
+  if(off){['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev, off));}
+}
+press(btnSprint, ()=>{sprintHold=true; btnSprint.classList.add('on');},
+                 ()=>{sprintHold=false; btnSprint.classList.remove('on');});
+press(btnHide, ()=>toggleCrouch());
+press(btnAct,  ()=>doAction());
+
+function toggleCrouch(){
+  if(player.bike) return;
+  player.crouch=!player.crouch;
+  btnHide.classList.toggle('on', player.crouch);
+}
+function doAction(){
+  if(player.bike){ dismount(false); }
+  else if(nearBike){
+    player.bike=nearBike; nearBike.taken=true; player.crouch=false;
+    btnHide.classList.remove('on'); msg('🚲 fiets gepakt', true); sfx(900,.08,'triangle',.15);
+  }
+}
+function dismount(inWaterDrop){
+  const b=player.bike; if(!b) return;
+  b.taken=false;
+  const back = inWaterDrop? -1.6 : 0;
+  b.x = player.x + Math.sin(player.rot)*back + Math.cos(player.rot)*1.2;
+  b.z = player.z + Math.cos(player.rot)*back - Math.sin(player.rot)*1.2;
+  b.g.position.set(b.x,0,b.z);
+  player.bike=null;
+  msg(inWaterDrop?'🌊 fiets achtergelaten bij de sloot':'🚲 afgestapt', true);
+}
+
+/* ---------- jager-AI ---------- */
+function carRoute(h, tx, tz){
+  const colX=nearestRoad(tx), rowZ=nearestRoad(tz);
+  if(h.axis==='h') return [{x:colX, z:h.z}, {x:colX, z:tz}];
+  return [{x:h.x, z:rowZ}, {x:colX, z:rowZ}, {x:colX, z:tz}];
+}
+function driveStep(h, dt){
+  const fresh = tNow-intel.t < CFG.intelFreshDrive;
+  if(fresh){
+    if(h.routeT!==intel.t && tNow>h.nextRoute){
+      h.wps=carRoute(h, intel.x, intel.z); h.routeT=intel.t; h.nextRoute=tNow+.8; h.parkTgt=true;
+    }
+  } else if(h.wps.length===0){
+    const rx=CFG.roads[(Math.random()*4)|0], rz=CFG.roads[(Math.random()*4)|0];
+    h.wps=carRoute(h, rx, rz); h.parkTgt=false;
+  }
+  let step=CFG.carSpeed*dt;
+  while(step>0 && h.wps.length){
+    const w=h.wps[0], dx=w.x-h.x, dz=w.z-h.z, d=Math.hypot(dx,dz);
+    if(d>.01) h.axis = Math.abs(dx)>Math.abs(dz)?'h':'v';
+    if(d<=step){h.x=w.x; h.z=w.z; h.wps.shift(); step-=d;}
+    else {h.x+=dx/d*step; h.z+=dz/d*step; h.car.rotation.y=Math.atan2(dx,dz); step=0;}
+  }
+  h.car.position.set(h.x,0,h.z);
+  if(h.parkTgt && fresh &&
+     (dist(h.x,h.z,intel.x,intel.z)<CFG.exitDist || h.wps.length===0)){
+    h.mode='foot'; h.carX=h.x; h.carZ=h.z; h.fx=h.x; h.fz=h.z;
+    h.fig.visible=true; h.searchUntil=0;
+  }
+  if(dist(h.x,h.z,player.x,player.z)<2.2) endGame(false);
+}
+function footStep(h, dt){
+  let tx=intel.x, tz=intel.z;
+  if(h.searchUntil>0){
+    if(tNow>h.searchUntil){h.mode='return'; h.searchUntil=0; return;}
+    tx=h.searchX; tz=h.searchZ;
+    if(dist(h.fx,h.fz,tx,tz)<1.6){
+      h.searchX=intel.x+rand(-13,13); h.searchZ=intel.z+rand(-13,13);
+    }
+  } else {
+    if(!h.sees && dist(h.fx,h.fz,intel.x,intel.z)<2.4){
+      h.searchUntil=tNow+7; h.searchX=intel.x+rand(-13,13); h.searchZ=intel.z+rand(-13,13);
+    }
+    if(tNow-intel.t>CFG.intelLive &&
+       (tNow-intel.t>20 || dist(h.fx,h.fz,intel.x,intel.z)>90)){h.mode='return'; return;}
+  }
+  moveFoot(h, tx, tz, dt);
+  if(dist(h.fx,h.fz,player.x,player.z)<CFG.catchR) endGame(false);
+}
+function returnStep(h, dt){
+  if(tNow-intel.t<CFG.intelLive && dist(h.fx,h.fz,intel.x,intel.z)<28){h.mode='foot'; return;}
+  moveFoot(h, h.carX, h.carZ, dt);
+  if(dist(h.fx,h.fz,player.x,player.z)<CFG.catchR) endGame(false);
+  if(dist(h.fx,h.fz,h.carX,h.carZ)<2){
+    h.mode='drive'; h.fig.visible=false; h.wps=[]; h.routeT=-1; h.parkTgt=false;
+  }
+}
+function moveFoot(h, tx, tz, dt){
+  const wm = inWater(h.fx,h.fz)? CFG.waterMul : 1;
+  const dx=tx-h.fx, dz=tz-h.fz, d=Math.hypot(dx,dz)||1;
+  const st=Math.min(CFG.footSpeed*wm*dt, d);
+  h.fx+=dx/d*st; h.fz+=dz/d*st;
+  const p={x:h.fx, z:h.fz}; collideEntity(p,.55); h.fx=p.x; h.fz=p.z;
+  h.fig.position.set(h.fx, inWater(h.fx,h.fz)?-.4:0, h.fz);
+  h.fig.rotation.y=Math.atan2(dx,dz);
+}
+function senseStep(h){
+  if(tNow<h.losT) return; h.losT=tNow+.15;
+  const sx=h.mode==='drive'?h.x:h.fx, sz=h.mode==='drive'?h.z:h.fz;
+  const d=dist(sx,sz,player.x,player.z);
+  let maxD = h.mode==='drive'? CFG.seeCar : CFG.seeFoot;
+  if(hiddenNow) maxD=CFG.seeHidden;
+  else if(player.bike) maxD+=CFG.bikePenalty;
+  let sees=false;
+  if(d<maxD){
+    tmpA.set(sx,1.7,sz);
+    tmpB.set(player.x,1.3,player.z).sub(tmpA);
+    const L=tmpB.length(); tmpB.normalize();
+    ray.set(tmpA,tmpB); ray.far=Math.max(L-.6,.1);
+    sees = ray.intersectObjects(losBlockers,false).length===0;
+  }
+  h.sees=sees;
+  if(sees){
+    intel.x=player.x; intel.z=player.z; intel.t=tNow;
+    seenFlash=tNow+.6;
+    if(tNow>spotCd){spotCd=tNow+5; msg('🚨 Ze hebben je gezien!'); sfxSpot();}
+  }
+}
+
+/* ---------- game state ---------- */
+let state='menu', tNow=0, timeLeft=CFG.surviveTime, nextPing=CFG.pingInterval,
+    pings=0, seenFlash=-9, hiddenNow=false;
+
+function reset(){
+  player.x=SPAWN.x; player.z=SPAWN.z; player.rot=0; player.stam=CFG.stamMax;
+  player.crouch=false; player.boostT=-9;
+  if(player.bike) player.bike=null;
+  btnHide.classList.remove('on'); btnSprint.classList.remove('on'); sprintHold=false;
+  for(const b of bikes){b.taken=false; b.x=b.hx; b.z=b.hz; b.g.position.set(b.x,0,b.z);}
+  for(const d of drinks){d.done=false; d.m.visible=true;}
+  intel.x=SPAWN.x; intel.z=SPAWN.z; intel.t=0;
+  tNow=0; timeLeft=CFG.surviveTime; nextPing=CFG.pingInterval; pings=0; seenFlash=-9; spotCd=0;
+  hunters.forEach(h=>{
+    h.mode='drive'; h.x=h.spawn.x; h.z=h.spawn.z; h.axis=h.spawn.axis;
+    h.fx=h.x; h.fz=h.z; h.carX=h.x; h.carZ=h.z;
+    h.wps=[]; h.routeT=-1; h.nextRoute=0; h.parkTgt=false; h.sees=false;
+    h.searchUntil=0; h.losT=0;
+    h.car.position.set(h.x,0,h.z); h.fig.visible=false;
+  });
+  camYaw=Math.PI*.15; camPitch=.42;
+}
+function fmt(s){s=Math.max(0,Math.ceil(s)); return `${(s/60)|0}:${String(s%60).padStart(2,'0')}`;}
+function endGame(win){
+  if(state!=='play') return;
+  state='over';
+  $('endEyebrow').textContent = win? 'Uitzending afgelopen · jij wint':'Uitzending afgelopen';
+  $('endTitle').innerHTML = win? 'Ont<span>snapt!</span> 🏆':'Ge<span>pakt!</span> 🚔';
+  const survived=CFG.surviveTime-timeLeft;
+  $('endStats').innerHTML =
+    `⏱ overleefd: <b>${fmt(win?CFG.surviveTime:survived)}</b> van ${fmt(CFG.surviveTime)}<br>`+
+    `📍 locatiedelingen: <b>${pings}</b> &nbsp;·&nbsp; 🕵️ jagers: ${hunters.length}`;
+  $('endScr').style.display='flex';
+  win? sfxWin(): sfxLose();
+}
+$('btnStart').addEventListener('click', ()=>{
+  initAudio(); reset(); $('startScr').style.display='none'; state='play';
+  msg('🏃 Rennen! Ze kennen je droppunt', true);
+});
+$('btnRetry').addEventListener('click', ()=>{
+  initAudio(); reset(); $('endScr').style.display='none'; state='play';
+  msg('🏃 Nieuwe poging — succes', true);
+});
+
+/* ---------- speler-update ---------- */
+function playerStep(dt){
+  let ix=0, iy=0;
+  if(joy.active){ix=joy.x; iy=joy.y;}
+  else {
+    if(keys['w']||keys['arrowup']) iy+=1;
+    if(keys['s']||keys['arrowdown']) iy-=1;
+    if(keys['d']||keys['arrowright']) ix+=1;
+    if(keys['a']||keys['arrowleft']) ix-=1;
+  }
+  const len=Math.hypot(ix,iy); if(len>1){ix/=len; iy/=len;}
+  const moving=len>.08;
+  const sprinting=(sprintHold||keys['shift']) && player.stam>0 && moving && !player.crouch && !player.bike;
+  let spd = player.bike? CFG.bike : player.crouch? CFG.crouch : sprinting? CFG.sprint : CFG.walk;
+  if(tNow<player.boostT) spd*=1.3;
+  const wet=inWater(player.x,player.z);
+  if(wet){spd*=CFG.waterMul; if(player.bike) dismount(true);}
+  if(moving){
+    const s=Math.sin(camYaw), c=Math.cos(camYaw);
+    let mx=(-s)*iy + c*ix, mz=(-c)*iy + (-s)*ix;
+    const ml=Math.hypot(mx,mz)||1; mx/=ml; mz/=ml;
+    player.x+=mx*spd*dt; player.z+=mz*spd*dt;
+    player.rot=Math.atan2(mx,mz);
+    if(sprinting) player.stam=Math.max(0, player.stam-CFG.stamDrain*dt);
+  }
+  if(!sprinting) player.stam=Math.min(CFG.stamMax, player.stam+CFG.stamRegen*dt);
+  const p={x:player.x, z:player.z}; collideEntity(p,.55); player.x=p.x; player.z=p.z;
+  hiddenNow = player.crouch && !player.bike &&
+              bushes.some(b=>dist(b.x,b.z,player.x,player.z)<2.7);
+  const py=wet? -.5:0;
+  pMesh.position.set(player.x,py,player.z);
+  pMesh.rotation.y=player.rot;
+  pMesh.scale.y=player.crouch?.62:1;
+  if(player.bike){
+    player.bike.g.position.set(player.x,py,player.z);
+    player.bike.g.rotation.y=player.rot;
+  }
+  for(const d of drinks) if(!d.done && dist(d.x,d.z,player.x,player.z)<1.7){
+    d.done=true; d.m.visible=false;
+    player.stam=CFG.stamMax; player.boostT=tNow+4;
+    msg('⚡ Energie + boost!', true); sfx(1200,.1,'triangle',.18);
+  }
+  nearBike=null;
+  if(!player.bike) for(const b of bikes)
+    if(!b.taken && dist(b.x,b.z,player.x,player.z)<3){nearBike=b; break;}
+  const showAct = !!player.bike || !!nearBike;
+  btnAct.classList.toggle('hiddenB', !showAct);
+  btnAct.classList.toggle('on', !!player.bike);
+}
+
+/* ---------- hoofdlus ---------- */
+let hudT=0;
+if(!('ontouchstart' in window)) document.body.classList.add('deskOnly');
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(), .05);
+
+  if(state==='play'){
+    tNow+=dt; timeLeft-=dt;
+    if(timeLeft<=0){endGame(true);}
+    else {
+      nextPing-=dt;
+      if(nextPing<=0){
+        nextPing=CFG.pingInterval; pings++;
+        intel.x=player.x; intel.z=player.z; intel.t=tNow;
+        msg('📍 LOCATIE GEDEELD'); sfxPing();
+      }
+      playerStep(dt);
+      for(const h of hunters){
+        senseStep(h);
+        if(state!=='play') break;
+        if(h.mode==='drive') driveStep(h,dt);
+        else if(h.mode==='foot') footStep(h,dt);
+        else returnStep(h,dt);
+        if(state!=='play') break;
+      }
+    }
+    windmillHub.rotation.z += dt*.7;
+    for(let i=0;i<drinks.length;i++){
+      const d=drinks[i]; if(d.done) continue;
+      d.m.position.y=1+Math.sin(tNow*3+i)*.15; d.m.rotation.y+=dt*1.5;
+    }
+    const age=tNow-intel.t;
+    pingRing.visible = age<14;
+    if(pingRing.visible){
+      pingRing.position.set(intel.x,.06,intel.z);
+      const sc=1+.35*Math.sin(tNow*5); pingRing.scale.set(sc,sc,1);
+      pingRing.material.opacity=.9*(1-age/14);
+    }
+    $('vig').style.opacity = tNow<seenFlash? 1:0;
+
+    hudT-=dt;
+    if(hudT<=0){
+      hudT=.1;
+      const tm=$('timer'); tm.textContent=fmt(timeLeft);
+      tm.classList.toggle('low', timeLeft<30);
+      $('pingT').textContent=`📍 volgende deling: ${Math.ceil(Math.max(0,nextPing))}s`;
+      const sf=$('stamFill');
+      sf.style.width=player.stam+'%';
+      sf.classList.toggle('boost', tNow<player.boostT);
+      $('hideChip').style.display=hiddenNow?'block':'none';
+      drawMini();
+    }
+  }
+
+  const cx=player.x+Math.sin(camYaw)*Math.cos(camPitch)*camDist;
+  const cz=player.z+Math.cos(camYaw)*Math.cos(camPitch)*camDist;
+  const cy=1.6+Math.sin(camPitch)*camDist;
+  camera.position.set(cx,cy,cz);
+  camera.lookAt(player.x,1.7,player.z);
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize', ()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
