@@ -102,6 +102,8 @@ Pages aanzetten, eenmalig:
 
 Kies niet **Deploy from a branch**. Dan publiceert GitHub de repo zonder de tests, en wordt de deploy-job bewust rood met een melding.
 
+GitHub Pages is op een gratis account alleen beschikbaar voor publieke repo's. Maak je de repo privé, dan gaat de site offline, tenzij je een betaald abonnement hebt.
+
 De workflow draait bij elke push naar `main`, bij elke pull request (alleen testen), met de hand, en elke maandag. Dependabot biedt maandelijks updates van de gebruikte actions en van Playwright aan als pull request; merge die als de test groen is.
 
 ## Ontwikkelen en testen
