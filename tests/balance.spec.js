@@ -5,7 +5,8 @@
 // - Rood (blokkeert de deploy) alleen als het spel kapot is: een niveau is onwinbaar of altijd
 //   gewonnen, je wordt vrijwel direct op het droppunt gepakt, of Makkelijk/Normaal/Moeilijk staan
 //   niet meer in de goede volgorde.
-// - Waarschuwing (blokkeert niet) als Normaal duidelijk afwijkt van tests/balance.json. Zo kun je de
+// - Waarschuwing (blokkeert niet) als Normaal duidelijk afwijkt van tests/balance.json (2 of meer
+//   gewonnen potjes, meer dan 15 s stilstaan of meer dan 60 s mediaan). Zo kun je de
 //   balans bewust bijstellen via CFG; werk daarna balance.json bij met de nieuwe waarden.
 const fs = require('node:fs');
 const { test, expect } = require('@playwright/test');
@@ -44,10 +45,14 @@ test('balans: alle niveaus speelbaar, in de goede volgorde, Normaal dicht bij de
 
   const ref = REF.niveaus.normaal, n = m.normaal;
   const drift = [];
-  if (Math.abs(n.vluchtGewonnen - ref.vluchtGewonnen) >= 3) drift.push(`vluchten gewonnen ${n.vluchtGewonnen} (referentie ${ref.vluchtGewonnen})`);
+  if (Math.abs(n.vluchtGewonnen - ref.vluchtGewonnen) >= 2) drift.push(`vluchten gewonnen ${n.vluchtGewonnen} (referentie ${ref.vluchtGewonnen})`);
   if (Math.abs(n.stilGepaktNa - ref.stilGepaktNa) > 15) drift.push(`stilstaan gepakt na ${n.stilGepaktNa} s (referentie ${ref.stilGepaktNa} s)`);
   if (Math.abs(n.vluchtMediaan - ref.vluchtMediaan) > 60) drift.push(`vluchten mediaan ${n.vluchtMediaan} s (referentie ${ref.vluchtMediaan} s)`);
   if (drift.length) console.log(`::warning title=Balans Normaal verschoven::${drift.join('; ')}. Bewust? Werk tests/balance.json bij.`);
+  const zip = REF.zip.normaal;
+  const zipRegel = `Originele versie (zip) op Normaal: stilstaan ${zip.stilGepaktNa} s, vluchten ${zip.vluchtGewonnen}/${REF.seeds}, mediaan ${zip.vluchtMediaan} s.`;
+  console.log(zipRegel);
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, zipRegel + '\n');
 
   for (const l of LEVELS) {
     expect(m[l].vluchtGewonnen, `${l}: vluchten is nooit te winnen`).toBeGreaterThan(0);
