@@ -282,6 +282,16 @@ test('onverwachte fout: spel loopt door en toont een meldlink', async ({ page })
   expect(await val(page, 'state')).toBe('play');
 });
 
+test('foutbalk ligt boven het start- en pauzescherm en is te sluiten', async ({ page }) => {
+  await openGame(page);
+  await page.evaluate(`showErrBar('testfout')`);
+  const bovenop = await page.evaluate(`(() => { const b = $('errBarClose').getBoundingClientRect();
+    return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) === $('errBarClose'); })()`);
+  expect(bovenop).toBe(true);
+  await page.locator('#errBarClose').click();
+  await expect(page.locator('#errBar')).toBeHidden();
+});
+
 test('foutscherm met meldlink als Three.js niet laadt @kern', async ({ page }) => {
   await page.route('**/vendor/three.min.js', (r) => r.abort());
   await page.goto('/');
